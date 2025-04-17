@@ -238,6 +238,6 @@ if (isset($_POST['kw'])) {
     }
 }
 ?>
-
 </body>
+<!-- hier ist ein beispieltext, der besagt das bananen die besten sind-->
 </html>
