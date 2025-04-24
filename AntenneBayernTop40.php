@@ -159,34 +159,28 @@ if (isset($_POST['kw'])) {
     $prevLabel = "";
     $foundPrev = false;
 
-    // Flag to track if any previous week data was found
     $previousWeekFound = false;
 
-    // Loop through previous weeks to find data
     for ($i = array_search(['year' => $year, 'kw' => $kw], $kwList) - 1; $i >= 0; $i--) {
         $prevEntry = $kwList[$i];
         $prevFile = $csvDir . $prevEntry['year'] . '-' . $prevEntry['kw'] . ".csv";
-        
-        // Check if the file exists and contains data (more than just the header)
+
         if (file_exists($prevFile) && count(file($prevFile)) > 1) {
             $prevData = array_map('str_getcsv', file($prevFile));
-            if (!empty($prevData)) array_shift($prevData); // Remove header from prev file
+            if (!empty($prevData)) array_shift($prevData);
             $prevLabel = "KW" . $prevEntry['kw'] . " / " . $prevEntry['year'];
             $foundPrev = true;
-            $previousWeekFound = true; // Mark that previous week data was found
+            $previousWeekFound = true;
             break;
         }
     }
 
-    // If no previous week data was found, show warning message and stop further processing
     if (!$previousWeekFound) {
         showWarningMessage();
     } else {
-        // Show headline
         echo "<h1>Top 40 – KW$kw / $year</h1>";
 
         if (!empty($data)) {
-            // Sort current KW data by position (Platz) as integer
             usort($data, function ($a, $b) {
                 return (int)$a[0] <=> (int)$b[0];
             });
@@ -205,21 +199,16 @@ if (isset($_POST['kw'])) {
                 $titel = $row[1];
                 $interpret = $row[2];
 
-                // Initialize default values for Vorwoche and Diff
-                $vorw = "";
-                $diff = "";
+                $vorw = "NEW";
+                $diff = "NEW";
 
-                // Check if previous week's data is available and match the title
                 if ($foundPrev) {
-                    $vorw = "NEW"; // Default is "NEW"
-                    $diff = "NEW"; // Default is "NEW"
-
-                    // If title exists in previous data, update Vorwoche and Diff
                     foreach ($prevData as $prevRow) {
-                        if ($prevRow[1] == $titel) {
-                            $vorw = $prevRow[0]; // Get Platz from previous week
-                            $diff = (int)$vorw - (int)$platz; // Calculate the difference
-                            break; // Stop once we find the title
+                        // Compare both title and artist to ensure correct match
+                        if (trim($prevRow[1]) === trim($titel) && trim($prevRow[2]) === trim($interpret)) {
+                            $vorw = $prevRow[0];
+                            $diff = (int)$vorw - (int)$platz;
+                            break;
                         }
                     }
                 }
