@@ -98,18 +98,18 @@
 </head>
 <body>
 
-<!-- Form with KW dropdown -->
+<!-- Dropdown form -->
 <form method="post">
     <div class="form-container">
         <label for="kw">Wähle eine KW: </label>
 
         <?php
-        // Set path to the CSV directory
+        // Set CSV directory
         $csvDir = "CSV/";
         $files = glob($csvDir . "*.csv");
         $kwList = [];
 
-        // Read all CSV files and extract KW/year
+        // Extract year and week from filenames
         foreach ($files as $file) {
             if (preg_match('/(\d{4})-(\d{1,2})\.csv$/', basename($file), $matches)) {
                 $year = $matches[1];
@@ -118,7 +118,7 @@
             }
         }
 
-        // Sort list by year and KW
+        // Sort weeks
         usort($kwList, function ($a, $b) {
             return ($a['year'] . $a['kw']) <=> ($b['year'] . $b['kw']);
         });
@@ -140,7 +140,7 @@
 </form>
 
 <?php
-// Function to display the warning message
+// Show error message if no previous data
 function showWarningMessage() {
     echo "<div class='warning'>Keine Daten der Vorwoche vorhanden!</div>";
 }
@@ -152,14 +152,11 @@ if (isset($_POST['kw'])) {
 
     $data = file_exists($filePath) ? array_map('str_getcsv', file($filePath)) : [];
 
-    if (!empty($data)) array_shift($data); // Remove header from selected KW
+    if (!empty($data)) array_shift($data); // Remove header row
 
-    // Fallback loop to find previous data
     $prevData = [];
     $prevLabel = "";
     $foundPrev = false;
-
-    $previousWeekFound = false;
 
     for ($i = array_search(['year' => $year, 'kw' => $kw], $kwList) - 1; $i >= 0; $i--) {
         $prevEntry = $kwList[$i];
@@ -167,15 +164,14 @@ if (isset($_POST['kw'])) {
 
         if (file_exists($prevFile) && count(file($prevFile)) > 1) {
             $prevData = array_map('str_getcsv', file($prevFile));
-            if (!empty($prevData)) array_shift($prevData);
+            array_shift($prevData);
             $prevLabel = "KW" . $prevEntry['kw'] . " / " . $prevEntry['year'];
             $foundPrev = true;
-            $previousWeekFound = true;
             break;
         }
     }
 
-    if (!$previousWeekFound) {
+    if (!$foundPrev) {
         showWarningMessage();
     } else {
         echo "<h1>Top 40 – KW$kw / $year</h1>";
@@ -203,12 +199,35 @@ if (isset($_POST['kw'])) {
                 $diff = "NEW";
 
                 if ($foundPrev) {
+                    $foundInPrevWeek = false;
+
                     foreach ($prevData as $prevRow) {
-                        // Compare both title and artist to ensure correct match
                         if (trim($prevRow[1]) === trim($titel) && trim($prevRow[2]) === trim($interpret)) {
                             $vorw = $prevRow[0];
                             $diff = (int)$vorw - (int)$platz;
+                            $foundInPrevWeek = true;
                             break;
+                        }
+                    }
+
+                    // Check earlier weeks if not found in direct previous week
+                    if (!$foundInPrevWeek) {
+                        for ($j = $i - 1; $j >= 0; $j--) {
+                            $olderEntry = $kwList[$j];
+                            $olderFile = $csvDir . $olderEntry['year'] . '-' . $olderEntry['kw'] . ".csv";
+
+                            if (file_exists($olderFile) && count(file($olderFile)) > 1) {
+                                $olderData = array_map('str_getcsv', file($olderFile));
+                                array_shift($olderData);
+
+                                foreach ($olderData as $olderRow) {
+                                    if (trim($olderRow[1]) === trim($titel) && trim($olderRow[2]) === trim($interpret)) {
+                                        $vorw = "RE";
+                                        $diff = "RE";
+                                        break 2;
+                                    }
+                                }
+                            }
                         }
                     }
                 }
