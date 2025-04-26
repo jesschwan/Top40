@@ -102,7 +102,7 @@
 
 <form method="post">
     <div class="form-container">
-        <label for="kw">Wähle: </label>
+        <label for="kw">Select: </label>
 
         <?php
         // Set CSV directory
@@ -110,7 +110,7 @@
         $files = glob($csvDir . "*.csv");
         $kwList = [];
 
-        // Extract year and week from filenames for weekly files (Jahr-KW.csv)
+        // Collect week files (format: year-week.csv)
         foreach ($files as $file) {
             if (preg_match('/(\d{4})-(\d{2})\.csv$/', basename($file), $matches)) {
                 $year = $matches[1];
@@ -119,15 +119,15 @@
             }
         }
 
-        // Extract year from filenames for yearly files (Jahr.csv)
+        // Collect yearly files (format: year.csv)
         foreach ($files as $file) {
             if (preg_match('/(\d{4})\.csv$/', basename($file), $matches)) {
                 $year = $matches[1];
-                $kwList[] = ['year' => $year, 'kw' => 'yearly']; // Special flag for yearly files
+                $kwList[] = ['year' => $year, 'kw' => 'yearly'];
             }
         }
 
-        // Sort weeks
+        // Sort list
         usort($kwList, function ($a, $b) {
             return ($a['year'] . $a['kw']) <=> ($b['year'] . $b['kw']);
         });
@@ -138,7 +138,8 @@
             foreach ($kwList as $entry) {
                 $value = $entry['year'] . '-' . $entry['kw'];
                 $label = ($entry['kw'] === 'yearly') ? $entry['year'] : $entry['year'] . " / KW" . $entry['kw'];
-                $selected = (isset($_POST['kw']) && $_POST['kw'] === $value) || (!isset($_POST['kw']) && $value === end($kwList)['year'] . '-' . end($kwList)['kw']) ? 'selected' : '';
+                $selected = (isset($_POST['kw']) && $_POST['kw'] === $value) ||
+                    (!isset($_POST['kw']) && $value === end($kwList)['year'] . '-' . end($kwList)['kw']) ? 'selected' : '';
                 echo "<option value=\"$value\" $selected>$label</option>";
             }
             ?>
@@ -149,23 +150,25 @@
 </form>
 
 <?php
-
-// Show error message if no previous data
+// Show warning if no previous week data exists
 function showWarningMessage() {
-    echo "<div class='warning'>Keine Daten der Vorwoche vorhanden!</div>";
+    echo "<div class='warning'>No previous week data available!</div>";
 }
 
-// Find best placement for a given song across all weeks
-function getBestPlacement($titel, $interpret, $csvDir) {
+// Get best chart position of a song across all weeks (up to current selection)
+function getBestPlacement($title, $artist, $csvDir, $maxYear) {
     $files = glob($csvDir . "*.csv");
-    $bestPlacement = 41; // Default as worse than 40th
+    $bestPlacement = 41;
 
     foreach ($files as $file) {
+        if (preg_match('/(\d{4})/', basename($file), $matches)) {
+            if ((int)$matches[1] > (int)$maxYear) continue;
+        }
+
         $data = array_map('str_getcsv', file($file));
-        array_shift($data); // Remove header row
+        array_shift($data);
         foreach ($data as $row) {
-            // Avoid errors caused by undefined array index
-            if (isset($row[1]) && isset($row[2]) && trim($row[1]) === trim($titel) && trim($row[2]) === trim($interpret)) {
+            if (isset($row[1], $row[2]) && trim($row[1]) === trim($title) && trim($row[2]) === trim($artist)) {
                 $placement = (int) $row[0];
                 if ($placement < $bestPlacement) {
                     $bestPlacement = $placement;
@@ -174,23 +177,18 @@ function getBestPlacement($titel, $interpret, $csvDir) {
         }
     }
 
-    // Special cases for the "Cruel Summer" and "The Feeling"
-    if ($titel === 'Cruel Summer' && $interpret === 'Taylor Swift') {
-        return 1;
-    } elseif ($titel === 'The Feeling' && $interpret === 'Lost Frequencies') {
-        return 1;
-    }
+    // Special cases
+    if ($title === 'Cruel Summer' && $artist === 'Taylor Swift') return 1;
+    if ($title === 'The Feeling' && $artist === 'Lost Frequencies') return 1;
 
-    return $bestPlacement === 41 ? "Nie auf Platz 1" : $bestPlacement;
+    return $bestPlacement === 41 ? "Never #1" : $bestPlacement;
 }
 
-// Find the previous week (next earlier week) for a given KW
+// Find next earlier available week
 function getNextEarlierWeek($currentYear, $currentKW, $csvDir) {
-    $files = glob($csvDir . $currentYear . '-' . $currentKW . '.csv');
     $prevKW = (int) $currentKW - 1;
     $prevFile = $csvDir . $currentYear . '-' . str_pad($prevKW, 2, '0', STR_PAD_LEFT) . '.csv';
-    
-    // If there's no file for the previous week, search for a previous one
+
     while (!file_exists($prevFile) && $prevKW > 0) {
         $prevKW--;
         $prevFile = $csvDir . $currentYear . '-' . str_pad($prevKW, 2, '0', STR_PAD_LEFT) . '.csv';
@@ -199,115 +197,125 @@ function getNextEarlierWeek($currentYear, $currentKW, $csvDir) {
     return file_exists($prevFile) ? [$prevKW, $currentYear] : null;
 }
 
-// Handle the selected week and year
+// Find previous appearance for RE (re-entry)
+function findPreviousPlacement($title, $artist, $csvDir, $currentYear, $currentKW) {
+    $years = range((int)$currentYear, 2020); // Adjust start year if needed
+    foreach ($years as $year) {
+        for ($kw = 53; $kw >= 1; $kw--) {
+            if ($year == $currentYear && $kw >= $currentKW) continue;
+            $file = sprintf("%s%04d-%02d.csv", $csvDir, $year, $kw);
+            if (file_exists($file)) {
+                $data = array_map('str_getcsv', file($file));
+                foreach ($data as $row) {
+                    if (isset($row[1], $row[2]) && trim($row[1]) === trim($title) && trim($row[2]) === trim($artist)) {
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+    return false;
+}
+
+// Main logic
 if (isset($_POST['kw'])) {
-    // If the selection is for a yearly file
     if (strpos($_POST['kw'], 'yearly') !== false) {
-        // Display the yearly top 40
+        // Display yearly charts
         [$year] = explode('-', $_POST['kw']);
         $csvFile = "$year.csv";
         $filePath = $csvDir . $csvFile;
-
         $data = file_exists($filePath) ? array_map('str_getcsv', file($filePath)) : [];
 
-        echo "<h1>Top 40 des Jahres $year</h1>";
+        echo "<h1>Top 40 of $year</h1>";
 
         if (!empty($data)) {
-            usort($data, function ($a, $b) {
-                return (int)$a[0] <=> (int)$b[0];
-            });
-
             echo "<table>
                 <tr>
-                    <th>Platz</th>
-                    <th>Titel</th>
-                    <th>Interpret</th>
-                    <th>Beste Platzierung</th>
-                    <th>Alte Nummer 1?</th>
+                    <th>Position</th>
+                    <th>Title</th>
+                    <th>Artist</th>
+                    <th>Best Position</th>
+                    <th>Former #1?</th>
                 </tr>";
 
             foreach ($data as $row) {
-                // Check for valid data in the row
                 if (isset($row[0], $row[1], $row[2])) {
-                    $platz = $row[0];
-                    $titel = $row[1];
-                    $interpret = $row[2];
-                    $bestePlatzierung = getBestPlacement($titel, $interpret, $csvDir);
-                    // Check if "beste Platzierung" is 1
-                    $alteNr1 = ($bestePlatzierung == 1) ? "Ja" : "Nein";
+                    $position = $row[0];
+                    $title = $row[1];
+                    $artist = $row[2];
+                    $bestPlacement = getBestPlacement($title, $artist, $csvDir, $year);
+                    $formerNo1 = ($bestPlacement == 1) ? "Yes" : "No";
 
                     echo "<tr>
-                            <td>$platz</td>
-                            <td>$titel</td>
-                            <td>$interpret</td>
-                            <td>$bestePlatzierung</td>
-                            <td>$alteNr1</td>
-                        </tr>";
+                        <td>$position</td>
+                        <td>$title</td>
+                        <td>$artist</td>
+                        <td>$bestPlacement</td>
+                        <td>$formerNo1</td>
+                    </tr>";
                 }
             }
 
             echo "</table>";
         }
-
     } else {
-        // Handle the weekly top 40
+        // Display weekly charts
         [$year, $kw] = explode('-', $_POST['kw']);
         $csvFile = "$year-$kw.csv";
         $filePath = $csvDir . $csvFile;
-
         $data = file_exists($filePath) ? array_map('str_getcsv', file($filePath)) : [];
 
-        if (!empty($data)) array_shift($data); // Remove header row
+        if (!empty($data)) array_shift($data); // Remove header
 
-        // Get the next earlier week for the "Vorw." column
         $nextEarlierWeek = getNextEarlierWeek($year, $kw, $csvDir);
 
         echo "<h1>Top 40 - KW$kw / $year</h1>";
 
         if (!empty($data)) {
-            usort($data, function ($a, $b) {
-                return (int)$a[0] <=> (int)$b[0];
-            });
-
             echo "<table>
                 <tr>
-                    <th>Platz</th>
-                    <th>Titel</th>
-                    <th>Interpret</th>
-                    <th>Vorw. (KW{$nextEarlierWeek[0]})</th>
+                    <th>Position</th>
+                    <th>Title</th>
+                    <th>Artist</th>
+                    <th>KW" . ($nextEarlierWeek ? $nextEarlierWeek[0] : "") . "</th>
                     <th>Diff.</th>
                 </tr>";
 
             foreach ($data as $row) {
-                // Check for valid data in the row
                 if (isset($row[0], $row[1], $row[2])) {
-                    $platz = $row[0];
-                    $titel = $row[1];
-                    $interpret = $row[2];
-
-                    // Default values for previous week (Vorw.) and difference (Diff.)
-                    $vorw = "NEW";
+                    $position = $row[0];
+                    $title = $row[1];
+                    $artist = $row[2];
+                    $prevWeek = "NEW";
                     $diff = "NEW";
 
-                    // If previous data exists, calculate Vorw. and Diff.
                     if ($nextEarlierWeek) {
-                        $prevData = array_map('str_getcsv', file($csvDir . $year . '-' . str_pad($nextEarlierWeek[0], 2, '0', STR_PAD_LEFT) . '.csv'));
-                        foreach ($prevData as $prevRow) {
-                            if (trim($prevRow[1]) === trim($titel) && trim($prevRow[2]) === trim($interpret)) {
-                                $vorw = $prevRow[0];
-                                $diff = (int)$vorw - (int)$platz;
-                                break;
+                        $prevFile = sprintf("%s%04d-%02d.csv", $csvDir, $nextEarlierWeek[1], $nextEarlierWeek[0]);
+                        if (file_exists($prevFile)) {
+                            $prevData = array_map('str_getcsv', file($prevFile));
+                            foreach ($prevData as $prevRow) {
+                                if (isset($prevRow[1], $prevRow[2]) && trim($prevRow[1]) === trim($title) && trim($prevRow[2]) === trim($artist)) {
+                                    $prevWeek = $prevRow[0];
+                                    $diff = (int)$prevWeek - (int)$position;
+                                    break;
+                                }
                             }
                         }
                     }
 
+                    // If not found in previous week but exists earlier -> RE
+                    if ($prevWeek === "NEW" && findPreviousPlacement($title, $artist, $csvDir, $year, $kw)) {
+                        $prevWeek = "RE";
+                        $diff = "RE";
+                    }
+
                     echo "<tr>
-                            <td>$platz</td>
-                            <td>$titel</td>
-                            <td>$interpret</td>
-                            <td>$vorw</td>
-                            <td>$diff</td>
-                        </tr>";
+                        <td>$position</td>
+                        <td>$title</td>
+                        <td>$artist</td>
+                        <td>$prevWeek</td>
+                        <td>$diff</td>
+                    </tr>";
                 }
             }
 
@@ -316,6 +324,5 @@ if (isset($_POST['kw'])) {
     }
 }
 ?>
-
 </body>
 </html>
