@@ -146,10 +146,18 @@
 </form>
 
 <?php
+
+    function getData4KW ($year, $kw, $csvDir) {
+        $csvFile = "$year-$kw.csv";
+        $filePath = $csvDir.$csvFile;
+        $data = file_exists($filePath) ? array_map('str_getcsv', file($filePath)) : [ ];
+        return $data;
+    }
+
     // Display warning if no earlier week available
     function showWarningMessage($csvDir, $year, $kw) {
-        $previousWeekData = getNextEarlierWeek($year, $kw, $csvDir);
-        if (!$previousWeekData) {
+        // Only for the very first week (week 43 of 2023), a warning should be displayed
+        if ((int)$year === 2023 && (int)$kw === 43) {
             echo "<div class='warning'>Keine Daten der Vorwoche vorhanden!</div>";
             return true;
         }
@@ -258,18 +266,14 @@
             }
         } else {
             [$year, $kw] = explode('-', $_POST['kw']);
-            $csvFile = "$year-$kw.csv";
-            $filePath = $csvDir . $csvFile;
-            $data = file_exists($filePath) ? array_map('str_getcsv', file($filePath)) : [];
-            if (!empty($data)) array_shift($data);
 
-            if (showWarningMessage($csvDir, $year, $kw)) {
-                return;
-            }
+            if (!empty($data)) array_shift($data);
 
             $nextEarlierWeek = getNextEarlierWeek($year, $kw, $csvDir);
 
             echo "<h1>Top 40 - KW$kw / $year</h1>";
+
+            showWarningMessage($csvDir, $year, $kw);
 
             if (!empty($data)) {
                 usort($data, function ($a, $b) {
