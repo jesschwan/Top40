@@ -100,48 +100,44 @@
 
 <body>
 
-<form method="post">
-    <div class="form-container">
-        <label for="kw">Wähle: </label>
-        <?php
-        $csvDir = "CSV/";
-        $files = glob($csvDir . "*.csv");
-        $kwList = [];
-
-        foreach ($files as $file) {
-            if (preg_match('/(\d{4})-(\d{2})\.csv$/', basename($file), $matches)) {
-                $year = $matches[1];
-                $kw = $matches[2];
-                $kwList[] = ['year' => $year, 'kw' => $kw];
-            }
-        }
-
-        foreach ($files as $file) {
-            if (preg_match('/(\d{4})\.csv$/', basename($file), $matches)) {
-                $year = $matches[1];
-                $kwList[] = ['year' => $year, 'kw' => 'yearly'];
-            }
-        }
-
-        usort($kwList, function ($a, $b) {
-            return ($a['year'] . $a['kw']) <=> ($b['year'] . $b['kw']);
-        });
-        ?>
-        <select name="kw" class="dropdown">
-            <?php
-            foreach ($kwList as $entry) {
-                $value = $entry['year'] . '-' . $entry['kw'];
-                $label = ($entry['kw'] === 'yearly') ? $entry['year'] : $entry['year'] . " / KW" . $entry['kw'];
-                $selected = (isset($_POST['kw']) && $_POST['kw'] === $value) || (!isset($_POST['kw']) && $value === end($kwList)['year'] . '-' . end($kwList)['kw']) ? 'selected' : '';
-                echo "<option value=\"$value\" $selected>$label</option>";
-            }
-            ?>
-        </select>
-        <button type="submit">Submit</button>
-    </div>
-</form>
-
 <?php
+
+function getKWOptions($directory, $selectedKW = null){
+    $files = glob($csvDir . "*.csv");  
+    $kwList = [];
+    foreach ($files as $file) {
+        if (preg_match('/(\d{4})-(\d{2})\.csv$/', basename($file), $matches)) {
+            $year = $matches[1];
+            $kw = $matches[2];
+            $kwList[] = ['year' => $year, 'kw' => $kw];
+        }
+    }
+
+    foreach ($files as $file) {
+        if (preg_match('/(\d{4})\.csv$/', basename($file), $matches)) {
+            $year = $matches[1];
+            $kwList[] = ['year' => $year, 'kw' => 'yearly'];
+        }
+    }   
+    
+    usort($kwList, function ($a, $b) {
+        return ($a['year'] . $a['kw']) <=> ($b['year'] . $b['kw']);
+    });
+
+    $html = '';
+    $lastValue = end($kwList)['year'] . '-' . end($kwList)['kw'];
+
+    foreach ($kwList as $entry) {
+        $value = $entry['year'] . '-' . $entry['kw'];
+        $label = ($entry['kw'] === 'yearly') ? $entry['year'] : $entry['year'] . " / KW" . $entry['kw'];
+        $selected = (isset($_POST['kw']) && $_POST['kw'] === $value) || (!isset($_POST['kw']) && $value === end($kwList)['year'] . '-' . end($kwList)['kw']) ? 'selected' : '';
+        $html .= "<option value=\"$value\" $selected>$label</option>\n";
+    }
+
+    return $html;
+
+}
+
 
 function getData4KW($year, $kw, $csvDir) {
     $csvFile = "$year-$kw.csv";
