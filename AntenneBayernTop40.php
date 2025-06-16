@@ -327,11 +327,18 @@
                                 $prevWeekLabel = "Vorwoche";
                             }
 
-                            echo "<h1>Top 40 – KW$kw / $year</h1>";
-                            echo "<table>
-                                <tr>
-                                    <th>Platz</th><th>Titel</th><th>Interpret</th><th>$prevWeekLabel</th><th>Diff.</th>
-                                </tr>";
+                        $selectedLabel = "$year / KW" . str_pad($kw, 2, '0', STR_PAD_LEFT);
+                        echo "<h1>Top 40 – $selectedLabel</h1>";
+
+                        $prevWeekLabel = $prevWeekInfo
+                            ? $prevYear . " / KW" . str_pad($prevKW, 2, '0', STR_PAD_LEFT)
+                            : "Vorwoche";
+
+                        echo "<table>
+                            <tr>
+                                <th>Platz</th><th>Titel</th><th>Interpret</th><th>$prevWeekLabel</th><th>Diff.</th>
+                            </tr>";
+
 
                     foreach ($data as $row) {
                         if (isset($row[0], $row[1], $row[2])) {
