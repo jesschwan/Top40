@@ -213,56 +213,74 @@
 
                 // Get previous week data (rank and diff or status)
                 function getPreviousWeekData($titel, $interpret, $currentYear, $currentKW, $csvDir, $kwList) {
-                    
-                    // Return '?' for unknown titles or artists
+                    // If title or artist is just a question mark, return unknown indicators
                     if (trim($titel) === '?' || trim($interpret) === '?') {
                         return ['vorw' => '?', 'diff' => '?'];
                     }
 
+                    // Default return value if no previous data is found: mark as NEW
                     $prevData = ['vorw' => "NEW", 'diff' => "NEW"];
 
+                    // Get the next earlier week (year and week number) relative to current week
                     $nextEarlierWeek = getNextEarlierWeek($currentYear, $currentKW, $csvDir);
                     if (!$nextEarlierWeek) {
+                        // If no earlier week exists, return default NEW
                         return $prevData;
                     }
 
+                    // Extract previous week and year
                     list($prevKW, $prevYear) = $nextEarlierWeek;
+                    // Construct filename for the previous week's CSV file
                     $prevFile = $csvDir . $prevYear . '-' . str_pad($prevKW, 2, '0', STR_PAD_LEFT) . '.csv';
 
-                    if (!file_exists($prevFile)) {
-                        return $prevData;
-                    }
+                    $foundInLastWeek = false;
 
-                    $prevWeekData = array_map('str_getcsv', file($prevFile));
-                    array_shift($prevWeekData);
-
-                    foreach ($prevWeekData as $prevRow) {
-                        if (trim($prevRow[1]) === trim($titel) && trim($prevRow[2]) === trim($interpret)) {
-                            $vorw = $prevRow[0];
-                            // diff is calculated later
-                            return ['vorw' => $vorw, 'diff' => null];
+                    // Check if previous week's file exists
+                    if (file_exists($prevFile)) {
+                        // Read CSV file and parse data (skip header row)
+                        $prevWeekData = array_map('str_getcsv', file($prevFile));
+                        array_shift($prevWeekData);
+                        // Loop through previous week's data to find matching title and artist
+                        foreach ($prevWeekData as $prevRow) {
+                            if (trim($prevRow[1]) === trim($titel) && trim($prevRow[2]) === trim($interpret)) {
+                                $foundInLastWeek = true;
+                                $vorw = $prevRow[0]; // Position or rank from previous week
+                                // Return found position, diff is not calculated here (null)
+                                return ['vorw' => $vorw, 'diff' => null];
+                            }
                         }
                     }
 
-                    // Check older weeks for re-entries (RE)
-                    for ($j = count($kwList) - 1; $j >= 0; $j--) {
-                        $olderEntry = $kwList[$j];
-                        if ($olderEntry['year'] . '-' . $olderEntry['kw'] < $currentYear . '-' . $currentKW) {
-                            $olderFile = $csvDir . $olderEntry['year'] . '-' . $olderEntry['kw'] . ".csv";
-                            if (file_exists($olderFile) && count(file($olderFile)) > 1) {
-                                $olderData = array_map('str_getcsv', file($olderFile));
-                                array_shift($olderData);
-                                foreach ($olderData as $olderRow) {
-                                    if (trim($olderRow[1]) === trim($titel) && trim($olderRow[2]) === trim($interpret)) {
-                                        return ['vorw' => "RE", 'diff' => "RE"];
+                    // If NOT found in last week, check for "RE" (re-entry) in older weeks
+                    if (!$foundInLastWeek) {
+                        foreach ($kwList as $entry) {
+                            // Construct string representation of the week (year-week)
+                            $entryValue = $entry['year'] . '-' . $entry['kw'];
+                            $currentValue = $currentYear . '-' . str_pad($currentKW, 2, '0', STR_PAD_LEFT);
+                            // Only check weeks older than the current week
+                            if ($entryValue < $currentValue) {
+                                // Build filename for the older week CSV
+                                $olderFile = $csvDir . $entry['year'] . '-' . str_pad($entry['kw'], 2, '0', STR_PAD_LEFT) . ".csv";
+                                if (file_exists($olderFile)) {
+                                    // Read and parse older week data, skipping header
+                                    $olderData = array_map('str_getcsv', file($olderFile));
+                                    array_shift($olderData);
+                                    // Search for matching title and artist in older weeks
+                                    foreach ($olderData as $olderRow) {
+                                        if (trim($olderRow[1]) === trim($titel) && trim($olderRow[2]) === trim($interpret)) {
+                                            // Mark as re-entry if found in an older week but not last week
+                                            return ['vorw' => "RE", 'diff' => "RE"];
+                                        }
                                     }
                                 }
                             }
                         }
                     }
 
+                    // If not found in any previous week, return NEW status
                     return $prevData;
                 }
+
 
                 // Main logic depending on POST data
                 if (isset($_POST['kw'])) {
