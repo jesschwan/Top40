@@ -213,6 +213,12 @@
 
                 // Get previous week data (rank and diff or status)
                 function getPreviousWeekData($titel, $interpret, $currentYear, $currentKW, $csvDir, $kwList) {
+                    
+                    // Return '?' for unknown titles or artists
+                    if (trim($titel) === '?' || trim($interpret) === '?') {
+                        return ['vorw' => '?', 'diff' => '?'];
+                    }
+
                     $prevData = ['vorw' => "NEW", 'diff' => "NEW"];
 
                     $nextEarlierWeek = getNextEarlierWeek($currentYear, $currentKW, $csvDir);
