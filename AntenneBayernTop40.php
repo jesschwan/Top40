@@ -195,22 +195,30 @@
                     }
 
                     $files = glob($csvDir . "*.csv");
-                    $bestPlacement = 41;
+                    $bestPlacement = 41; // Platzierungen außerhalb der Top 40
+
                     foreach ($files as $file) {
                         $filename = basename($file);
-                        if (preg_match('/^(2023|2024|2025)-\d{2}\.csv$/', $filename)) {
-                            $data = array_map('str_getcsv', file($file));
-                            array_shift($data);
-                            foreach ($data as $row) {
-                                if (isset($row[1], $row[2]) && trim($row[1]) === trim($titel) && trim($row[2]) === trim($interpret)) {
-                                    $placement = (int)$row[0];
-                                    if ($placement < $bestPlacement) {
-                                        $bestPlacement = $placement;
+                        if (preg_match('/^(\d{4})-\d{2}\.csv$/', $filename, $matches)) {
+                            $fileYear = (int)$matches[1];
+
+                            // Nur Dateien ab 2023 berücksichtigen
+                            if ($fileYear >= 2023) {
+                                $data = array_map('str_getcsv', file($file));
+                                array_shift($data); // Header entfernen
+
+                                foreach ($data as $row) {
+                                    if (isset($row[1], $row[2]) && trim($row[1]) === trim($titel) && trim($row[2]) === trim($interpret)) {
+                                        $placement = (int)$row[0];
+                                        if ($placement < $bestPlacement) {
+                                            $bestPlacement = $placement;
+                                        }
                                     }
                                 }
                             }
                         }
                     }
+
                     return $bestPlacement === 41 ? "Nie auf Platz 1" : $bestPlacement;
                 }
 
