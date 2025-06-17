@@ -130,6 +130,7 @@
         </form>
 
         <?php
+                require "SqlConnection.php";
 
                 // Render a table row for yearly or weekly view
                 function renderTableRow($platz, $titel, $interpret, $vorw = null, $diff = null, $bestePlatzierung = null, $alteNr1 = null) {
@@ -147,10 +148,24 @@
                 }
 
                 // Load data for specific year and week
-                function getData4KW($year, $kw, $csvDir) {
+                // returns array containing: 
+                function getData4KW_notUsed($year, $kw, $csvDir) {
                     $csvFile = "$year-" . str_pad($kw, 2, '0', STR_PAD_LEFT) . ".csv";
                     $filePath = $csvDir . $csvFile;
                     return file_exists($filePath) ? array_map('str_getcsv', file($filePath)) : [];
+                }
+                
+                function getData4KW($openDbConnection, $year, $kw) {
+                    $KWDataArray = array();
+
+                    $query = 'SELECT * FROM top40 WHERE kw=? AND jahr=? ORDER BY Name LIMIT 40';
+                    echo $query;
+                    $result = $openDbConnection->execute_query($query, $kw, $year);
+                    foreach ($result as $row) {
+                        array_push($KWDataArray, "".$row["platz"]. "," . $row["titel"]. "," . $row["interpret"]. "," . $row["kw"]-1 . ",," );
+                        print_r($KWDataArray);
+                    }                    
+                    return $KWDataArray;
                 }
 
                 // Show warning message if no data for previous week
@@ -292,7 +307,12 @@
                     return $prevData;
                 }
 
+                // following code will be exeuted. bcause this is opened in browser, also e.g. refresh
                 // Main logic depending on POST data
+                
+                // open DB once
+                $openDbConnection = getSqlConnection();
+
                 if (isset($_POST['kw'])) {
                     $kwList = [];
                     foreach (glob($csvDir . "*.csv") as $filename) {
@@ -338,7 +358,7 @@
                         // Weekly view
                         [$year, $kw] = explode('-', $_POST['kw']);
                         $kw = (int)$kw; // ensure integer
-                        $data = getData4KW($year, $kw, $csvDir);
+                        $data = getData4KW($openDbConnection, $year, $kw);
 
                         if (showWarningMessage($csvDir, $year, $kw)) return;
 
@@ -390,6 +410,8 @@
                         echo "<div class='warning'>Keine Daten für KW$kw / $year gefunden.</div>";
                     }
                 }
+
+                mysql_close($openDbConnection);
             }
         ?>
 
