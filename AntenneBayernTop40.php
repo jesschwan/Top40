@@ -96,10 +96,13 @@
                     if (!isset($kwList)) {
                         $kwList = [];
                         foreach (glob($csvDir . "*.csv") as $filename) {
-                            if (preg_match('/(\d{4})-(\d{2}|yearly)\.csv$/', basename($filename), $matches)) {
-                                $kwList[] = ['year' => $matches[1], 'kw' => $matches[2]];
+                            if (preg_match('/^(\d{4})(?:-(\d{2}))?\.csv$/', basename($filename), $matches)) {
+                                $year = $matches[1];
+                                $kw = isset($matches[2]) ? $matches[2] : 'yearly'; // Wenn keine KW, dann yearly
+                                $kwList[] = ['year' => $year, 'kw' => $kw];
                             }
                         }
+
                         usort($kwList, function($a, $b) {
                             if ($a['year'] === $b['year']) {
                                 if ($a['kw'] === 'yearly') return 1;
@@ -280,7 +283,6 @@
                     // If not found in any previous week, return NEW status
                     return $prevData;
                 }
-
 
                 // Main logic depending on POST data
                 if (isset($_POST['kw'])) {
