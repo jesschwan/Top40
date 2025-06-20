@@ -1,3 +1,353 @@
+<?php
+    require "SqlConnection.php";
+
+    // Render a table row for yearly or weekly view
+    function renderTableRow($platz, $titel, $interpret, $vorw = null, $diff = null, $bestePlatzierung = null, $alteNr1 = null) {
+        echo "<tr>
+            <td>$platz</td>
+            <td>$titel</td>
+            <td>$interpret</td>";
+        
+        if ($bestePlatzierung !== null && $alteNr1 !== null) {
+            echo "<td>$bestePlatzierung</td><td>$alteNr1</td>";
+        } elseif ($vorw !== null && $diff !== null) {
+            echo "<td>$vorw</td><td>$diff</td>";
+        }
+        echo "</tr>";
+    }
+
+    // Load data for specific year and week
+    // returns array containing: 
+    function getData4KW_notUsed($year, $kw, $csvDir) {
+        $KWDataArray = array();
+        $csvFile = "$year-" . str_pad($kw, 2, '0', STR_PAD_LEFT) . ".csv";
+        $filePath = $csvDir . $csvFile;
+        $KWDataArray = file_exists($filePath) ? array_map('str_getcsv', file($filePath)) : [];
+        return $KWDataArray;
+    }
+    
+    function getData4KW($openDbConnection, $year, $kw) {
+        $KWDataArray = array();
+
+        $query = "SELECT * FROM top40 WHERE kw = '$kw' AND jahr = '$year' ORDER BY platz LIMIT 40";
+        //echo $query;
+
+        // Prepare the SQL statement
+        $stmt = $openDbConnection->prepare($query);
+        if (!$stmt) {
+            die("Error preparing the query: " . $openDbConnection->error);
+        }
+      
+        // Execute the prepared statement
+        $stmt->execute();
+
+        // Get the result set
+        $result = $stmt->get_result();
+
+        $currentPlatz = 0;
+        // Process each row
+        while ($row = $result->fetch_assoc()) {
+            if ( $currentPlatz != $row["platz"])
+                $KWDataArray[] = (''.$row["platz"] . "," . $row["titel"] . "," . $row["interpret"] . "," . ($row["kw"] - 1) . ",,");
+            $currentPlatz = $row["platz"];
+
+        }
+        //print_r($KWDataArray);
+        return $KWDataArray;
+    }
+
+    // Show warning message if no data for previous week
+    function showWarningMessage($year, $kw) {
+        if ((int)$year === 2023 && (int)$kw === 43) {
+            echo "<div class='warning'>Keine Daten der Vorwoche vorhanden!</div>";
+            return true;
+        }
+        return false;
+    }
+
+    // Find next earlier week with available CSV data
+    function getNextEarlierWeek($openDbConnection, $currentYear, $currentKW) {
+        $year = (int)$currentYear;
+        $previousKw = (int)$currentKW - 1;
+
+        // if kw was first one -> pick last of previous year
+        if ( $previousKw <= 0) {
+            $year = $year-1;
+            // ask DB for last existing week in previous year
+            /* Select queries return a resultset */
+            $result = $mysqli->query("SELECT kw, jahr FROM top40 WHERE jahr='$year' ORDER BY '$kw' DESC LIMIT 1");
+            if ($result->num_rows == 1) {
+                $previousKW = $result->fetch_assoc();
+            }
+        }
+        //echo "my previous KW to (".$currentKW.")=".$previousKw;
+        return $previousKw;
+    }
+
+    // Get best placement across all CSVs
+    function getBestPlacement($titel, $interpret, $csvDir) {
+        $specialCases = [
+            ['titel' => 'Cruel Summer', 'interpret' => 'Taylor Swift'],
+            ['titel' => 'The Feeling', 'interpret' => 'Lost Frequencies']
+        ];
+
+        foreach ($specialCases as $case) {
+            if (trim($titel) === $case['titel'] && trim($interpret) === $case['interpret']) {
+                return 1;
+            }
+        }
+
+        $files = glob($csvDir . "*.csv");
+        $bestPlacement = 41; // Platzierungen außerhalb der Top 40
+
+        foreach ($files as $file) {
+            $filename = basename($file);
+            if (preg_match('/^(\d{4})-\d{2}\.csv$/', $filename, $matches)) {
+                $fileYear = (int)$matches[1];
+
+                // Nur Dateien ab 2023 berücksichtigen
+                if ($fileYear >= 2023) {
+                    $data = array_map('str_getcsv', file($file));
+                    array_shift($data); // Header entfernen
+
+                    foreach ($data as $row) {
+                        if (isset($row[1], $row[2]) && trim($row[1]) === trim($titel) && trim($row[2]) === trim($interpret)) {
+                            $placement = (int)$row[0];
+                            if ($placement < $bestPlacement) {
+                                $bestPlacement = $placement;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        return $bestPlacement === 41 ? "Nie auf Platz 1" : $bestPlacement;
+    }
+
+    // gets the list of kw s over all years from csv files in directory 
+    function getKwList_notUsed($csvDir) {
+        $kwList = [];
+        foreach (glob($csvDir . "*.csv") as $filename) {
+            if (preg_match('/(\d{4})-(\d{2}|yearly)\.csv$/', basename($filename), $matches)) {
+                $kwList[] = ['year' => $matches[1], 'kw' => $matches[2]];
+            }
+        }
+        return $kwList;
+    }
+    function getKwList($openDbConnection) {
+        $kwList = [];
+
+        $query = "SELECT DISTINCT kw, jahr FROM top40 WHERE 1 ORDER BY jahr ASC, kw ASC";
+        //echo $query;
+
+        // Prepare the SQL statement
+        $stmt = $openDbConnection->prepare($query);
+        if (!$stmt) {
+            die("Error preparing the query: " . $openDbConnection->error);
+        }
+
+        
+        // Execute the prepared statement
+        $stmt->execute();
+
+        // Get the result set
+        $result = $stmt->get_result();
+
+        // Process each row
+        while ($row = $result->fetch_assoc()) {
+            $kwList[] = ['year' => $row["jahr"], 'kw' => $row["kw"]];
+        }
+        return $kwList;                        
+    }
+
+
+    // Get previous week data (rank and diff or status)
+    function getPreviousWeekData($titel, $interpret, $currentYear, $currentKW, $csvDir, $kwList) {
+        // If title or artist is just a question mark, return unknown indicators
+        if (trim($titel) === '?' || trim($interpret) === '?') {
+            return ['vorw' => '?', 'diff' => '?'];
+        }
+
+        // Default return value if no previous data is found: mark as NEW
+        $prevData = ['vorw' => "NEW", 'diff' => "NEW"];
+
+        // Get the next earlier week (year and week number) relative to current week
+        $nextEarlierWeek = getNextEarlierWeek($currentYear, $currentKW, $csvDir);
+        if (!$nextEarlierWeek) {
+            // If no earlier week exists, return default NEW
+            return $prevData;
+        }
+
+        // Extract previous week and year
+        list($prevKW, $prevYear) = $nextEarlierWeek;
+        // Construct filename for the previous week's CSV file
+        $prevFile = $csvDir . $prevYear . '-' . str_pad($prevKW, 2, '0', STR_PAD_LEFT) . '.csv';
+
+        $foundInLastWeek = false;
+
+        // Check if previous week's file exists
+        if (file_exists($prevFile)) {
+            // Read CSV file and parse data (skip header row)
+            $prevWeekData = array_map('str_getcsv', file($prevFile));
+            array_shift($prevWeekData);
+            // Loop through previous week's data to find matching title and artist
+            foreach ($prevWeekData as $prevRow) {
+                if (trim($prevRow[1]) === trim($titel) && trim($prevRow[2]) === trim($interpret)) {
+                    $foundInLastWeek = true;
+                    $vorw = $prevRow[0]; // Position or rank from previous week
+                    // Return found position, diff is not calculated here (null)
+                    return ['vorw' => $vorw, 'diff' => null];
+                }
+            }
+        }
+
+        // If NOT found in last week, check for "RE" (re-entry) in older weeks
+        if (!$foundInLastWeek) {
+            foreach ($kwList as $entry) {
+                // Construct string representation of the week (year-week)
+                $entryValue = $entry['year'] . '-' . $entry['kw'];
+                $currentValue = $currentYear . '-' . str_pad($currentKW, 2, '0', STR_PAD_LEFT);
+                // Only check weeks older than the current week
+                if ($entryValue < $currentValue) {
+                    // Build filename for the older week CSV
+                    $olderFile = $csvDir . $entry['year'] . '-' . str_pad($entry['kw'], 2, '0', STR_PAD_LEFT) . ".csv";
+                    if (file_exists($olderFile)) {
+                        // Read and parse older week data, skipping header
+                        $olderData = array_map('str_getcsv', file($olderFile));
+                        array_shift($olderData);
+                        // Search for matching title and artist in older weeks
+                        foreach ($olderData as $olderRow) {
+                            if (trim($olderRow[1]) === trim($titel) && trim($olderRow[2]) === trim($interpret)) {
+                                // Mark as re-entry if found in an older week but not last week
+                                return ['vorw' => "RE", 'diff' => "RE"];
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // If not found in any previous week, return NEW status
+        return $prevData;
+    }
+
+    function getPrevWeekLabel4Header($openDbConnection, $year, $kw) {
+            // Get previous week label for header
+        $prevWeekInfo = getNextEarlierWeek($openDbConnection, $year, $kw);
+        if ($prevWeekInfo) {
+            [$prevKW, $prevYear] = $prevWeekInfo;
+            $prevWeekLabel = "KW" . $prevKW . " / " . $prevYear;
+        } else {
+            $prevWeekLabel = "Vorwoche";
+        }
+        return $prevWeekLabel;
+    }
+
+    // following code will be exeuted, because this is opened in browser, also e.g. every time again refresh
+    
+    // open DB once
+    $openDbConnection = getSqlConnection();
+
+    // Main logic depending on POST data
+    if (isset($_POST['kwYearDropDown'])) {
+
+        $kwList = getKwList($openDbConnection);
+
+        usort($kwList, function($a, $b) {
+            if ($a['year'] === $b['year']) {
+                if ($a['kw'] === 'yearly') return 1;
+                if ($b['kw'] === 'yearly') return -1;
+                return (int)$a['kw'] <=> (int)$b['kw'];
+            }
+            return (int)$a['year'] <=> (int)$b['year'];
+        });
+
+        if (strpos($_POST['kwYearDropDown'], 'yearly') !== false) {
+            // Yearly view
+            [$year] = explode('-', $_POST['kwYearDropDown']);
+            $filePath = $csvDir . "$year.csv";
+            $data = file_exists($filePath) ? array_map('str_getcsv', file($filePath)) : [];
+            if (!empty($data)) array_shift($data);
+
+            echo "<h1>Top 40 des Jahres $year</h1>";
+            echo "<table>
+                <tr>
+                    <th>Platz</th><th>Titel</th><th>Interpret</th><th>Beste Platzierung</th><th>Ehemalige Nr. 1?</th>
+                </tr>";
+
+            if ($data) {
+                foreach ($data as $row) {
+                    if (isset($row[0], $row[1], $row[2])) {
+                        $bestePlatzierung = getBestPlacement($row[1], $row[2], $csvDir);
+                        $alteNr1 = ($bestePlatzierung == 1) ? "Ja" : "Nein";
+                        renderTableRow($row[0], $row[1], $row[2], null, null, $bestePlatzierung, $alteNr1);
+                    }
+                }
+            }
+            echo "</table>";
+        } else {
+            // Weekly view
+            [$year, $kw] = explode('-', $_POST['kwYearDropDown']);
+            $kw = (int)$kw; // ensure integer
+            $data = getData4KW($openDbConnection, $year, $kw);
+            //$data = getData4KW_notUsed($year, $kw, $csvDir);
+
+            if (showWarningMessage($year, $kw)) return;
+
+            if (!empty($data)) {
+                getPrevWeekLabel4Header($openDbConnection, $year, $kw);
+            }
+
+            $selectedLabel = "$year / KW" . str_pad($kw, 2, '0', STR_PAD_LEFT);
+            echo "<h1>Top 40 – $selectedLabel</h1>";
+
+            $prevWeekLabel = $prevWeekInfo
+                ? $prevYear . " / KW" . str_pad($prevKW, 2, '0', STR_PAD_LEFT)
+                : "Vorwoche";
+
+            echo "<table>
+                <tr>
+                    <th>Platz</th><th>Titel</th><th>Interpret</th><th>$prevWeekLabel</th><th>Diff.</th>
+                </tr>";
+
+        // calculate missing data (platz vorwoche, differenz)  by (titel, interpret)
+        foreach ($data as $commaSepRow) {
+
+            $row = explode(',',$commaSepRow);
+            //print_r($row);
+            //echo "First row:"."  as index:".$row[0];
+            if (isset($row[0], $row[1], $row[2])) {
+                /*
+                // Get previous week data
+                $previousData = getPreviousWeekData($row[1], $row[2], $year, $kw, $csvDir, $kwList);
+
+                // Calculate diff if not set
+                if (is_numeric($previousData['vorw']) && $previousData['diff'] === null) {
+                    $diff = (int)$previousData['vorw'] - (int)$row[0];
+                    $previousData['diff'] = (string)$diff; // no "+" sign
+                }
+
+                // Render table row
+                renderTableRow($row[0], $row[1], $row[2], $previousData['vorw'], $previousData['diff']);
+                */
+
+                renderTableRow($row[0], $row[1], $row[2], "??", 'diff');
+            }
+        }
+
+
+            echo "</table>";
+        } else {
+            echo "<div class='warning'>Keine Daten für KW$kw / $year gefunden.</div>";
+        }
+    }
+
+    $openDbConnection->close();
+}
+?>
+
+<!-- HTML Code starts here ------------->
 <!DOCTYPE html>
 <html lang="de">
 
@@ -88,238 +438,15 @@
 
     <body>
 
-        <form method="post" class="form-container">
-                <label for="kw">Wähle:</label>
-                <?php 
-                    $csvDir = "./csv/"; // Path to CSV files
+    <form method="post" class="form-container">
+            <label for="kwYearDropDown">Wähle:</label>
+            <?php 
+                $csvDir = "./csv/"; // Path to CSV files
 
-                    if (!isset($kwList)) {
-                        $kwList = [];
-                        foreach (glob($csvDir . "*.csv") as $filename) {
-                            if (preg_match('/^(\d{4})(?:-(\d{2}))?\.csv$/', basename($filename), $matches)) {
-                                $year = $matches[1];
-                                $kw = isset($matches[2]) ? $matches[2] : 'yearly'; // Wenn keine KW, dann yearly
-                                $kwList[] = ['year' => $year, 'kw' => $kw];
-                            }
-                        }
-
-                        usort($kwList, function($a, $b) {
-                            if ($a['year'] === $b['year']) {
-                                if ($a['kw'] === 'yearly') return 1;
-                                if ($b['kw'] === 'yearly') return -1;
-                                return (int)$a['kw'] <=> (int)$b['kw'];
-                            }
-                            return (int)$a['year'] <=> (int)$b['year'];
-                        });
-                    }
-
-                    function generateDropdown($kwList, $selectedKw = null) {
-                        $options = '';
-                        foreach ($kwList as $entry) {
-                            $value = $entry['year'] . '-' . $entry['kw'];
-                            $label = ($entry['kw'] === 'yearly') ? $entry['year'] : $entry['year'] . " / KW" . $entry['kw'];
-                            $selected = ($selectedKw === $value) || ($selectedKw === null && $value === end($kwList)['year'] . '-' . end($kwList)['kw']) ? 'selected' : '';
-                            $options .= "<option value=\"$value\" $selected>$label</option>";
-                        }
-                        echo "<select name=\"kw\" class=\"dropdown\">$options</select>";
-                    }
-
-                    generateDropdown($kwList, $_POST['kw'] ?? null);
-                ?>
-            <button type="submit">Submit</button>
-        </form>
-
-        <?php
-                require "SqlConnection.php";
-
-                // Render a table row for yearly or weekly view
-                function renderTableRow($platz, $titel, $interpret, $vorw = null, $diff = null, $bestePlatzierung = null, $alteNr1 = null) {
-                    echo "<tr>
-                        <td>$platz</td>
-                        <td>$titel</td>
-                        <td>$interpret</td>";
-                    
-                    if ($bestePlatzierung !== null && $alteNr1 !== null) {
-                        echo "<td>$bestePlatzierung</td><td>$alteNr1</td>";
-                    } elseif ($vorw !== null && $diff !== null) {
-                        echo "<td>$vorw</td><td>$diff</td>";
-                    }
-                    echo "</tr>";
-                }
-
-                // Load data for specific year and week
-                // returns array containing: 
-                function getData4KW_notUsed($year, $kw, $csvDir) {
-                    $csvFile = "$year-" . str_pad($kw, 2, '0', STR_PAD_LEFT) . ".csv";
-                    $filePath = $csvDir . $csvFile;
-                    return file_exists($filePath) ? array_map('str_getcsv', file($filePath)) : [];
-                }
-                
-                function getData4KW($openDbConnection, $year, $kw) {
-                    $KWDataArray = array();
-
-                    $query = 'SELECT * FROM top40 WHERE kw=? AND jahr=? ORDER BY Name LIMIT 40';
-                    echo $query;
-                    $result = $openDbConnection->execute_query($query, $kw, $year);
-                    foreach ($result as $row) {
-                        array_push($KWDataArray, "".$row["platz"]. "," . $row["titel"]. "," . $row["interpret"]. "," . $row["kw"]-1 . ",," );
-                        print_r($KWDataArray);
-                    }                    
-                    return $KWDataArray;
-                }
-
-                // Show warning message if no data for previous week
-                function showWarningMessage($csvDir, $year, $kw) {
-                    if ((int)$year === 2023 && (int)$kw === 43) {
-                        echo "<div class='warning'>Keine Daten der Vorwoche vorhanden!</div>";
-                        return true;
-                    }
-                    return false;
-                }
-
-                // Find next earlier week with available CSV data
-                function getNextEarlierWeek($currentYear, $currentKW, $csvDir) {
-                    $year = (int)$currentYear;
-                    $kw = (int)$currentKW - 1;
-
-                    while ($year >= 2023) {
-                        while ($kw > 0) {
-                            $filename = $csvDir . $year . '-' . str_pad($kw, 2, '0', STR_PAD_LEFT) . '.csv';
-                            if (file_exists($filename)) {
-                                return [$kw, $year];
-                            }
-                            $kw--;
-                        }
-                        $year--;
-                        $kw = 53;
-                    }
-                    return null;
-                }
-
-                // Get best placement across all CSVs
-                function getBestPlacement($titel, $interpret, $csvDir) {
-                    $specialCases = [
-                        ['titel' => 'Cruel Summer', 'interpret' => 'Taylor Swift'],
-                        ['titel' => 'The Feeling', 'interpret' => 'Lost Frequencies']
-                    ];
-
-                    foreach ($specialCases as $case) {
-                        if (trim($titel) === $case['titel'] && trim($interpret) === $case['interpret']) {
-                            return 1;
-                        }
-                    }
-
-                    $files = glob($csvDir . "*.csv");
-                    $bestPlacement = 41; // Platzierungen außerhalb der Top 40
-
-                    foreach ($files as $file) {
-                        $filename = basename($file);
-                        if (preg_match('/^(\d{4})-\d{2}\.csv$/', $filename, $matches)) {
-                            $fileYear = (int)$matches[1];
-
-                            // Nur Dateien ab 2023 berücksichtigen
-                            if ($fileYear >= 2023) {
-                                $data = array_map('str_getcsv', file($file));
-                                array_shift($data); // Header entfernen
-
-                                foreach ($data as $row) {
-                                    if (isset($row[1], $row[2]) && trim($row[1]) === trim($titel) && trim($row[2]) === trim($interpret)) {
-                                        $placement = (int)$row[0];
-                                        if ($placement < $bestPlacement) {
-                                            $bestPlacement = $placement;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    return $bestPlacement === 41 ? "Nie auf Platz 1" : $bestPlacement;
-                }
-
-                // Get previous week data (rank and diff or status)
-                function getPreviousWeekData($titel, $interpret, $currentYear, $currentKW, $csvDir, $kwList) {
-                    // If title or artist is just a question mark, return unknown indicators
-                    if (trim($titel) === '?' || trim($interpret) === '?') {
-                        return ['vorw' => '?', 'diff' => '?'];
-                    }
-
-                    // Default return value if no previous data is found: mark as NEW
-                    $prevData = ['vorw' => "NEW", 'diff' => "NEW"];
-
-                    // Get the next earlier week (year and week number) relative to current week
-                    $nextEarlierWeek = getNextEarlierWeek($currentYear, $currentKW, $csvDir);
-                    if (!$nextEarlierWeek) {
-                        // If no earlier week exists, return default NEW
-                        return $prevData;
-                    }
-
-                    // Extract previous week and year
-                    list($prevKW, $prevYear) = $nextEarlierWeek;
-                    // Construct filename for the previous week's CSV file
-                    $prevFile = $csvDir . $prevYear . '-' . str_pad($prevKW, 2, '0', STR_PAD_LEFT) . '.csv';
-
-                    $foundInLastWeek = false;
-
-                    // Check if previous week's file exists
-                    if (file_exists($prevFile)) {
-                        // Read CSV file and parse data (skip header row)
-                        $prevWeekData = array_map('str_getcsv', file($prevFile));
-                        array_shift($prevWeekData);
-                        // Loop through previous week's data to find matching title and artist
-                        foreach ($prevWeekData as $prevRow) {
-                            if (trim($prevRow[1]) === trim($titel) && trim($prevRow[2]) === trim($interpret)) {
-                                $foundInLastWeek = true;
-                                $vorw = $prevRow[0]; // Position or rank from previous week
-                                // Return found position, diff is not calculated here (null)
-                                return ['vorw' => $vorw, 'diff' => null];
-                            }
-                        }
-                    }
-
-                    // If NOT found in last week, check for "RE" (re-entry) in older weeks
-                    if (!$foundInLastWeek) {
-                        foreach ($kwList as $entry) {
-                            // Construct string representation of the week (year-week)
-                            $entryValue = $entry['year'] . '-' . $entry['kw'];
-                            $currentValue = $currentYear . '-' . str_pad($currentKW, 2, '0', STR_PAD_LEFT);
-                            // Only check weeks older than the current week
-                            if ($entryValue < $currentValue) {
-                                // Build filename for the older week CSV
-                                $olderFile = $csvDir . $entry['year'] . '-' . str_pad($entry['kw'], 2, '0', STR_PAD_LEFT) . ".csv";
-                                if (file_exists($olderFile)) {
-                                    // Read and parse older week data, skipping header
-                                    $olderData = array_map('str_getcsv', file($olderFile));
-                                    array_shift($olderData);
-                                    // Search for matching title and artist in older weeks
-                                    foreach ($olderData as $olderRow) {
-                                        if (trim($olderRow[1]) === trim($titel) && trim($olderRow[2]) === trim($interpret)) {
-                                            // Mark as re-entry if found in an older week but not last week
-                                            return ['vorw' => "RE", 'diff' => "RE"];
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    // If not found in any previous week, return NEW status
-                    return $prevData;
-                }
-
-                // following code will be exeuted. bcause this is opened in browser, also e.g. refresh
-                // Main logic depending on POST data
-                
-                // open DB once
-                $openDbConnection = getSqlConnection();
-
-                if (isset($_POST['kw'])) {
+                if (!isset($kwList)) {
                     $kwList = [];
-                    foreach (glob($csvDir . "*.csv") as $filename) {
-                        if (preg_match('/(\d{4})-(\d{2}|yearly)\.csv$/', basename($filename), $matches)) {
-                            $kwList[] = ['year' => $matches[1], 'kw' => $matches[2]];
-                        }
-                    }
+                    $kwList = getKwList($openDbConnection);
+
                     usort($kwList, function($a, $b) {
                         if ($a['year'] === $b['year']) {
                             if ($a['kw'] === 'yearly') return 1;
@@ -328,92 +455,29 @@
                         }
                         return (int)$a['year'] <=> (int)$b['year'];
                     });
-
-                    if (strpos($_POST['kw'], 'yearly') !== false) {
-                        // Yearly view
-                        [$year] = explode('-', $_POST['kw']);
-                        $filePath = $csvDir . "$year.csv";
-                        $data = file_exists($filePath) ? array_map('str_getcsv', file($filePath)) : [];
-                        if (!empty($data)) array_shift($data);
-
-                        echo "<h1>Top 40 des Jahres $year</h1>";
-                        echo "<table>
-                            <tr>
-                                <th>Platz</th><th>Titel</th><th>Interpret</th><th>Beste Platzierung</th><th>Ehemalige Nr. 1?</th>
-                            </tr>";
-
-                        if ($data) {
-                            usort($data, function ($a, $b) { return (int)$a[0] <=> (int)$b[0]; });
-
-                            foreach ($data as $row) {
-                                if (isset($row[0], $row[1], $row[2])) {
-                                    $bestePlatzierung = getBestPlacement($row[1], $row[2], $csvDir);
-                                    $alteNr1 = ($bestePlatzierung == 1) ? "Ja" : "Nein";
-                                    renderTableRow($row[0], $row[1], $row[2], null, null, $bestePlatzierung, $alteNr1);
-                                }
-                            }
-                        }
-                        echo "</table>";
-                    } else {
-                        // Weekly view
-                        [$year, $kw] = explode('-', $_POST['kw']);
-                        $kw = (int)$kw; // ensure integer
-                        $data = getData4KW($openDbConnection, $year, $kw);
-
-                        if (showWarningMessage($csvDir, $year, $kw)) return;
-
-                        if (!empty($data)) {
-                            array_shift($data); // remove header
-                            usort($data, function ($a, $b) { return (int)$a[0] <=> (int)$b[0]; });
-
-                            // Get previous week label for header
-                            $prevWeekInfo = getNextEarlierWeek($year, $kw, $csvDir);
-                            if ($prevWeekInfo) {
-                                [$prevKW, $prevYear] = $prevWeekInfo;
-                                $prevWeekLabel = "KW" . $prevKW . " / " . $prevYear;
-                            } else {
-                                $prevWeekLabel = "Vorwoche";
-                            }
-
-                        $selectedLabel = "$year / KW" . str_pad($kw, 2, '0', STR_PAD_LEFT);
-                        echo "<h1>Top 40 – $selectedLabel</h1>";
-
-                        $prevWeekLabel = $prevWeekInfo
-                            ? $prevYear . " / KW" . str_pad($prevKW, 2, '0', STR_PAD_LEFT)
-                            : "Vorwoche";
-
-                        echo "<table>
-                            <tr>
-                                <th>Platz</th><th>Titel</th><th>Interpret</th><th>$prevWeekLabel</th><th>Diff.</th>
-                            </tr>";
-
-
-                    foreach ($data as $row) {
-                        if (isset($row[0], $row[1], $row[2])) {
-                            // Get previous week data
-                            $previousData = getPreviousWeekData($row[1], $row[2], $year, $kw, $csvDir, $kwList);
-
-                            // Calculate diff if not set
-                            if (is_numeric($previousData['vorw']) && $previousData['diff'] === null) {
-                                $diff = (int)$previousData['vorw'] - (int)$row[0];
-                                $previousData['diff'] = (string)$diff; // no "+" sign
-                            }
-
-                            // Render table row
-                            renderTableRow($row[0], $row[1], $row[2], $previousData['vorw'], $previousData['diff']);
-                        }
-                    }
-
-
-                        echo "</table>";
-                    } else {
-                        echo "<div class='warning'>Keine Daten für KW$kw / $year gefunden.</div>";
-                    }
                 }
 
-                mysql_close($openDbConnection);
-            }
-        ?>
+                function generateDropdown($kwList, $selectedKw = null) {
+                    $options = '';
+                    foreach ($kwList as $entry) {
+                        $value = $entry['year'] . '-' . $entry['kw'];
+                        $label = ($entry['kw'] === 'yearly') ? $entry['year'] : $entry['year'] . " / KW" . $entry['kw'];
+                        $selected = ($selectedKw === $value) || ($selectedKw === null && $value === end($kwList)['year'] . '-' . end($kwList)['kw']) ? 'selected' : '';
+                        $options .= "<option value=\"$value\" $selected>$label</option>";
+                    }
+                    echo "<select name='kwYearDropDown' class=\"dropdown\">$options</select>";
+                }
 
+                generateDropdown($kwList, $_POST['kwYearDropDown'] ?? null);
+            ?>
+        <button type="submit">Submit</button>
+    </form>
+    <table>
+        <tr>
+            <th>Platz</th><th>Titel</th><th>Interpret</th><th>$prevWeekLabel</th><th>Diff.</th>
+
+        </tr>
+    </table>
     </body>
 </html>
+
