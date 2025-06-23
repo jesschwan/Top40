@@ -17,7 +17,8 @@
     }
 
     // Load data for specific year and week
-    // returns array containing: 
+    // returns array containing:
+    /*
     function getData4KW_notUsed($year, $kw, $csvDir) {
         $KWDataArray = array();
         $csvFile = "$year-" . str_pad($kw, 2, '0', STR_PAD_LEFT) . ".csv";
@@ -25,6 +26,7 @@
         $KWDataArray = file_exists($filePath) ? array_map('str_getcsv', file($filePath)) : [];
         return $KWDataArray;
     }
+    */
     
     function getData4KW($openDbConnection, $year, $kw) {
         $KWDataArray = array();
@@ -126,6 +128,7 @@
     }
 
     // gets the list of kw s over all years from csv files in directory 
+    /*
     function getKwList_notUsed($csvDir) {
         $kwList = [];
         foreach (glob($csvDir . "*.csv") as $filename) {
@@ -135,6 +138,8 @@
         }
         return $kwList;
     }
+    */
+
     function getKwList($openDbConnection) {
         $kwList = [];
 
@@ -147,7 +152,6 @@
             die("Error preparing the query: " . $openDbConnection->error);
         }
 
-        
         // Execute the prepared statement
         $stmt->execute();
 
@@ -285,10 +289,28 @@
                     }
                 }
             }
-            echo "</table>";
+        }
+        
+           echo "</table>";
         } else {
             // Weekly view
+            if (isset($_POST['kwYearDropDown'])) {
+            // Split the selected value into year and week parts
             [$year, $kw] = explode('-', $_POST['kwYearDropDown']);
+            $kw = (int)$kw; // Optional: Ensure the week (KW) is treated as an integer
+            } else {
+                $kwList = getKwList($openDbConnection);
+                usort($kwList, function($a, $b) {
+                    if ($a['year'] === $b['year']) {
+                        return (int)$a['kw'] <=> (int)$b['kw'];
+                    }
+                    return (int)$a['year'] <=> (int)$b['year'];
+                });
+                $lastEntry = end($kwList);
+                $year = $lastEntry['year'];
+                $kw = (int)$lastEntry['kw'];
+            }
+
             $kw = (int)$kw; // ensure integer
             $data = getData4KW($openDbConnection, $year, $kw);
             //$data = getData4KW_notUsed($year, $kw, $csvDir);
@@ -302,49 +324,43 @@
             $selectedLabel = "$year / KW" . str_pad($kw, 2, '0', STR_PAD_LEFT);
             echo "<h1>Top 40 – $selectedLabel</h1>";
 
-            $prevWeekLabel = $prevWeekInfo
-                ? $prevYear . " / KW" . str_pad($prevKW, 2, '0', STR_PAD_LEFT)
-                : "Vorwoche";
+            // Get the name of the previous week to show in the header
+            $prevWeekLabel = getPrevWeekLabel4Header($openDbConnection, $year, $kw);
 
             echo "<table>
                 <tr>
                     <th>Platz</th><th>Titel</th><th>Interpret</th><th>$prevWeekLabel</th><th>Diff.</th>
                 </tr>";
+        }
 
-        // calculate missing data (platz vorwoche, differenz)  by (titel, interpret)
-        foreach ($data as $commaSepRow) {
+            // calculate missing data (platz vorwoche, differenz)  by (titel, interpret)
+            foreach ($data as $commaSepRow) {
 
-            $row = explode(',',$commaSepRow);
-            //print_r($row);
-            //echo "First row:"."  as index:".$row[0];
-            if (isset($row[0], $row[1], $row[2])) {
-                /*
-                // Get previous week data
-                $previousData = getPreviousWeekData($row[1], $row[2], $year, $kw, $csvDir, $kwList);
+                $row = explode(',',$commaSepRow);
+                //print_r($row);
+                //echo "First row:"."  as index:".$row[0];
+                if (isset($row[0], $row[1], $row[2])) {
+                    /*
+                    // Get previous week data
+                    $previousData = getPreviousWeekData($row[1], $row[2], $year, $kw, $csvDir, $kwList);
 
-                // Calculate diff if not set
-                if (is_numeric($previousData['vorw']) && $previousData['diff'] === null) {
-                    $diff = (int)$previousData['vorw'] - (int)$row[0];
-                    $previousData['diff'] = (string)$diff; // no "+" sign
+                    // Calculate diff if not set
+                    if (is_numeric($previousData['vorw']) && $previousData['diff'] === null) {
+                        $diff = (int)$previousData['vorw'] - (int)$row[0];
+                        $previousData['diff'] = (string)$diff; // no "+" sign
+                    }
+
+                    // Render table row
+                    renderTableRow($row[0], $row[1], $row[2], $previousData['vorw'], $previousData['diff']);
+                    */
+
+                    renderTableRow($row[0], $row[1], $row[2], "??", 'diff');
+                
+                } else {
+                        echo "<div class='warning'>...</div>";
                 }
-
-                // Render table row
-                renderTableRow($row[0], $row[1], $row[2], $previousData['vorw'], $previousData['diff']);
-                */
-
-                renderTableRow($row[0], $row[1], $row[2], "??", 'diff');
             }
-        }
-
-
             echo "</table>";
-        } else {
-            echo "<div class='warning'>Keine Daten für KW$kw / $year gefunden.</div>";
-        }
-    }
-
-    $openDbConnection->close();
-}
 ?>
 
 <!-- HTML Code starts here ------------->
@@ -472,12 +488,7 @@
             ?>
         <button type="submit">Submit</button>
     </form>
-    <table>
-        <tr>
-            <th>Platz</th><th>Titel</th><th>Interpret</th><th>$prevWeekLabel</th><th>Diff.</th>
 
-        </tr>
-    </table>
     </body>
 </html>
 
