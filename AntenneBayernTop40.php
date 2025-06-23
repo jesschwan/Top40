@@ -36,6 +36,7 @@
 
         // Prepare the SQL statement
         $stmt = $openDbConnection->prepare($query);
+
         if (!$stmt) {
             die("Error preparing the query: " . $openDbConnection->error);
         }
@@ -54,6 +55,7 @@
             $currentPlatz = $row["platz"];
 
         }
+
         //print_r($KWDataArray);
         return $KWDataArray;
     }
@@ -77,7 +79,7 @@
             $year = $year-1;
             // ask DB for last existing week in previous year
             /* Select queries return a resultset */
-            $result = $mysqli->query("SELECT kw, jahr FROM top40 WHERE jahr='$year' ORDER BY '$kw' DESC LIMIT 1");
+            $result = $openDbConnection->query("SELECT kw, jahr FROM top40 WHERE jahr='$year' ORDER BY kw DESC LIMIT 1");
             if ($result->num_rows == 1) {
                 $previousKW = $result->fetch_assoc();
             }
@@ -127,7 +129,7 @@
         return $bestPlacement === 41 ? "Nie auf Platz 1" : $bestPlacement;
     }
 
-    // gets the list of kw s over all years from csv files in directory 
+    // gets the list of kws over all years from csv files in directory 
     /*
     function getKwList_notUsed($csvDir) {
         $kwList = [];
@@ -167,7 +169,8 @@
 
 
     // Get previous week data (rank and diff or status)
-    function getPreviousWeekData($titel, $interpret, $currentYear, $currentKW, $csvDir, $kwList) {
+    /*
+    function getPreviousWeekData_notUsed($titel, $interpret, $currentYear, $currentKW, $csvDir, $kwList) {
         // If title or artist is just a question mark, return unknown indicators
         if (trim($titel) === '?' || trim($interpret) === '?') {
             return ['vorw' => '?', 'diff' => '?'];
@@ -177,11 +180,11 @@
         $prevData = ['vorw' => "NEW", 'diff' => "NEW"];
 
         // Get the next earlier week (year and week number) relative to current week
-        $nextEarlierWeek = getNextEarlierWeek($currentYear, $currentKW, $csvDir);
+        $nextEarlierWeek = getNextEarlierWeek($openDbConnection, $currentYear, $currentKW);
         if (!$nextEarlierWeek) {
             // If no earlier week exists, return default NEW
             return $prevData;
-        }
+        } 
 
         // Extract previous week and year
         list($prevKW, $prevYear) = $nextEarlierWeek;
@@ -234,6 +237,64 @@
 
         // If not found in any previous week, return NEW status
         return $prevData;
+    }
+    */
+
+    function getPreviousWeekData($titel, $interpret, $currentYear, $currentKW, $openDbConnection, $kwList) {
+        if (trim($titel) === '?' || trim($interpret) === '?') {
+            return ['prev' => '?', 'diff' => '?'];
+        }
+
+        $result = ['prev' => "NEW", 'diff' => "NEW"];
+
+        // Get previous week
+        $previous = getNextEarlierWeek($openDbConnection, $currentYear, $currentKW);
+        if (!$previous) {
+            return $result;
+        }
+
+        list($prevKW, $prevYear) = $previous;
+
+        // Check if title/artist existed in previous week
+        $query = "SELECT platz FROM top40
+                WHERE jahr = ? AND kw = ? AND titel = ? AND interpret = ?
+                LIMIT 1";
+
+        $stmt = $openDbConnection->prepare($query);
+        $stmt->bind_param("iiss", $prevYear, $prevKW, $titel, $interpret);
+        $stmt->execute();
+        $stmt->bind_result($platz);
+
+        if ($stmt->fetch()) {
+            $stmt->close();
+            return ['prev' => $platz, 'diff' => null];
+        }
+        $stmt->close();
+
+        // If not found in previous week, search older weeks for re-entry
+        foreach ($kwList as $entry) {
+            $entryKey = $entry['year'] . '-' . str_pad($entry['kw'], 2, '0', STR_PAD_LEFT);
+            $currentKey = $currentYear . '-' . str_pad($currentKW, 2, '0', STR_PAD_LEFT);
+
+            if ($entryKey < $currentKey) {
+                $query = "SELECT platz FROM top40
+                        WHERE jahr = ? AND kw = ? AND titel = ? AND interpret = ?
+                        LIMIT 1";
+
+                $stmt = $openDbConnection->prepare($query);
+                $stmt->bind_param("iiss", $entry['year'], $entry['kw'], $titel, $interpret);
+                $stmt->execute();
+                $stmt->bind_result($platz);
+
+                if ($stmt->fetch()) {
+                    $stmt->close();
+                    return ['prev' => "RE", 'diff' => "RE"];
+                }
+                $stmt->close();
+            }
+        }
+
+        return $result;
     }
 
     function getPrevWeekLabel4Header($openDbConnection, $year, $kw) {
@@ -292,7 +353,7 @@
         }
         
            echo "</table>";
-        } else {
+    } else {
             // Weekly view
             if (isset($_POST['kwYearDropDown'])) {
             // Split the selected value into year and week parts
@@ -331,36 +392,37 @@
                 <tr>
                     <th>Platz</th><th>Titel</th><th>Interpret</th><th>$prevWeekLabel</th><th>Diff.</th>
                 </tr>";
-        }
+    }   
 
-            // calculate missing data (platz vorwoche, differenz)  by (titel, interpret)
-            foreach ($data as $commaSepRow) {
+    // calculate missing data (platz vorwoche, differenz)  by (titel, interpret)
+    foreach ($data as $commaSepRow) {
 
-                $row = explode(',',$commaSepRow);
-                //print_r($row);
-                //echo "First row:"."  as index:".$row[0];
-                if (isset($row[0], $row[1], $row[2])) {
-                    /*
-                    // Get previous week data
-                    $previousData = getPreviousWeekData($row[1], $row[2], $year, $kw, $csvDir, $kwList);
+        $row = explode(',',$commaSepRow);
+        //print_r($row);
+        //echo "First row:"."  as index:".$row[0];
+        if (isset($row[0], $row[1], $row[2])) {
+            /*
+            // Get previous week data
+            $previousData = getPreviousWeekData($row[1], $row[2], $year, $kw, $csvDir, $kwList);
 
-                    // Calculate diff if not set
-                    if (is_numeric($previousData['vorw']) && $previousData['diff'] === null) {
-                        $diff = (int)$previousData['vorw'] - (int)$row[0];
-                        $previousData['diff'] = (string)$diff; // no "+" sign
-                    }
-
-                    // Render table row
-                    renderTableRow($row[0], $row[1], $row[2], $previousData['vorw'], $previousData['diff']);
-                    */
-
-                    renderTableRow($row[0], $row[1], $row[2], "??", 'diff');
-                
-                } else {
-                        echo "<div class='warning'>...</div>";
-                }
+            // Calculate diff if not set
+            if (is_numeric($previousData['vorw']) && $previousData['diff'] === null) {
+                $diff = (int)$previousData['vorw'] - (int)$row[0];
+                $previousData['diff'] = (string)$diff; // no "+" sign
             }
-            echo "</table>";
+
+            // Render table row
+            renderTableRow($row[0], $row[1], $row[2], $previousData['vorw'], $previousData['diff']);
+            */
+
+            renderTableRow($row[0], $row[1], $row[2], "??", 'diff');
+                
+        } else {
+            echo "<div class='warning'>...</div>";
+        }
+    }
+
+    echo "</table>";        
 ?>
 
 <!-- HTML Code starts here ------------->
@@ -453,42 +515,40 @@
     </head>
 
     <body>
+        <form method="post" class="form-container">
+                <label for="kwYearDropDown">Wähle:</label>
+                <?php 
+                    $csvDir = "./csv/"; // Path to CSV files
 
-    <form method="post" class="form-container">
-            <label for="kwYearDropDown">Wähle:</label>
-            <?php 
-                $csvDir = "./csv/"; // Path to CSV files
+                    if (!isset($kwList)) {
+                        $kwList = [];
+                        $kwList = getKwList($openDbConnection);
 
-                if (!isset($kwList)) {
-                    $kwList = [];
-                    $kwList = getKwList($openDbConnection);
-
-                    usort($kwList, function($a, $b) {
-                        if ($a['year'] === $b['year']) {
-                            if ($a['kw'] === 'yearly') return 1;
-                            if ($b['kw'] === 'yearly') return -1;
-                            return (int)$a['kw'] <=> (int)$b['kw'];
-                        }
-                        return (int)$a['year'] <=> (int)$b['year'];
-                    });
-                }
-
-                function generateDropdown($kwList, $selectedKw = null) {
-                    $options = '';
-                    foreach ($kwList as $entry) {
-                        $value = $entry['year'] . '-' . $entry['kw'];
-                        $label = ($entry['kw'] === 'yearly') ? $entry['year'] : $entry['year'] . " / KW" . $entry['kw'];
-                        $selected = ($selectedKw === $value) || ($selectedKw === null && $value === end($kwList)['year'] . '-' . end($kwList)['kw']) ? 'selected' : '';
-                        $options .= "<option value=\"$value\" $selected>$label</option>";
+                        usort($kwList, function($a, $b) {
+                            if ($a['year'] === $b['year']) {
+                                if ($a['kw'] === 'yearly') return 1;
+                                if ($b['kw'] === 'yearly') return -1;
+                                return (int)$a['kw'] <=> (int)$b['kw'];
+                            }
+                            return (int)$a['year'] <=> (int)$b['year'];
+                        });
                     }
-                    echo "<select name='kwYearDropDown' class=\"dropdown\">$options</select>";
-                }
 
-                generateDropdown($kwList, $_POST['kwYearDropDown'] ?? null);
-            ?>
-        <button type="submit">Submit</button>
-    </form>
+                    function generateDropdown($kwList, $selectedKw = null) {
+                        $options = '';
+                        foreach ($kwList as $entry) {
+                            $value = $entry['year'] . '-' . $entry['kw'];
+                            $label = ($entry['kw'] === 'yearly') ? $entry['year'] : $entry['year'] . " / KW" . $entry['kw'];
+                            $selected = ($selectedKw === $value) || ($selectedKw === null && $value === end($kwList)['year'] . '-' . end($kwList)['kw']) ? 'selected' : '';
+                            $options .= "<option value=\"$value\" $selected>$label</option>";
+                        }
+                        return "<select name='kwYearDropDown' class='dropdown'>$options</select>";
+                    }
 
+                    generateDropdown($kwList, $_POST['kwYearDropDown'] ?? null);
+                ?>
+            <button type="submit">Submit</button>
+        </form>
     </body>
 </html>
 
