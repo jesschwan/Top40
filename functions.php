@@ -20,12 +20,16 @@ function getKwList($openDbConnection) {
 }
 
 function generateDropdown($kwList, $selectedKw = null) {
-    $options = '';
+    echo '<select name="kwYearDropDown" class="dropdown">';
     foreach ($kwList as $entry) {
-        $value = $entry['year'] . '-' . $entry['kw'];
-        $label = ($entry['kw'] === 'yearly') ? $entry['year'] : $entry['year'] . " / KW" . $entry['kw'];
-        $selected = ($selectedKw === $value) || ($selectedKw === null && $value === end($kwList)['year'] . '-' . end($kwList)['kw']) ? 'selected' : '';
-        $options .= "<option value=\"$value\" $selected>$label</option>";
+        $kw = str_pad($entry['kw'], 2, '0', STR_PAD_LEFT);
+        $year = $entry['year'];
+        $value = "$year-$kw";
+        $label = "KW$kw / $year";
+        $selected = ($selectedKw === $value) ? 'selected' : '';
+        $selectedLabel = "KW" . str_pad($kw, 2, '0', STR_PAD_LEFT) . " / $year";
+        echo "<option value=\"$value\" $selected>$label</option>";
     }
-    echo "<select name='kwYearDropDown' class='dropdown'>$options</select>";
+    echo '</select>';
+    
 }
