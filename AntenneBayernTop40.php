@@ -3,21 +3,28 @@
     require "functions.php";
 
     // Render a table row for yearly or weekly view
-    function renderTableRow($platz, $title, $interpret, $vorw = null, $diff = null, $bestePlatzierung = null, $alteNr1 = null) {
+    function renderTableRow($platz, $title, $interpret, $vorw = null, $diff = null) {
         echo "<tr>
-            <td>$platz</td>
-            <td>$title</td>
-            <td>$interpret</td>";
+                <td>$platz</td>
+                <td>$title</td>
+                <td>$interpret</td>";
         
-        if ($bestePlatzierung !== null && $alteNr1 !== null) {
-            echo "<td>$bestePlatzierung</td><td>$alteNr1</td>";
-        } elseif ($vorw !== null && $diff !== null) {
-            echo "<td>$vorw</td><td>$diff</td>";
+        if ($vorw !== null && $diff !== null) {
+            $diffClass = '';
+            if (is_numeric($diff)) {
+                if ($diff > 0) $diffClass = ' class="diff-up"';
+                elseif ($diff < 0) $diffClass = ' class="diff-down"';
+            }
+            echo "<td>$vorw</td><td$diffClass>$diff</td>";
+        } else {
+            echo "<td></td><td></td>";
         }
+
         echo "</tr>";
     }
 
-    $data = []; // Standardwert, damit keine Fehler kommen
+
+    $data = []; // Default value to avoid errors
 
     function getData4KW($openDbConnection, $year, $kw) {
         $KWDataArray = array();
@@ -60,12 +67,13 @@
         return $KWDataArray;
     }
 
+    // Show warning message if there is no previous week data
     function showWarningMessage($year, $kw, $openDbConnection) {
         $prev = getNextEarlierWeek($openDbConnection, $year, $kw);
-        return !$prev; // Gibt TRUE zurück, wenn KEINE Vorwoche vorhanden ist
+        return !$prev; // Returns TRUE if NO previous week exists
     }
 
-    // Returns the next earlier week that exists in the DB, given a year and kw
+    // Returns the next earlier week available in the DB, given a year and week
     function getNextEarlierWeek($openDbConnection, $year, $kw) {
         $stmt = $openDbConnection->prepare("
             SELECT jahr, kw 
@@ -85,231 +93,126 @@
 
         if ($stmt->fetch()) {
             $stmt->close();
-            return [$prevKw, $prevYear];
+            // **HERE CORRECTION: Return order correctly (year, KW)**
+            return [$prevYear, $prevKw];
         }
 
         $stmt->close();
         return null;
     }
 
+    // Get previous week's rank and difference for a given song and current rank
     function getPreviousWeekData($title, $interpret, $year, $kw, $currentRank, $openDbConnection, $kwList) {
-        // 1. Finde die tatsächlich vorherige Woche aus der Liste
-        $prevEntry = null;
-        foreach ($kwList as $entry) {
-            if (
-                ($entry['year'] < $year) ||
-                ($entry['year'] === $year && $entry['kw'] < $kw)
-            ) {
-                $prevEntry = $entry;
-                break;
+        // Check KW formatting in kwList, best like this:
+        $searchKey = $year . '-' . str_pad($kw, 2, '0', STR_PAD_LEFT);
+        $mappedKeys = array_map(fn($e) => $e['year'] . '-' . str_pad($e['kw'], 2, '0', STR_PAD_LEFT), $kwList);
+        $currentIndex = array_search($searchKey, $mappedKeys);
+        if ($currentIndex === false) return ['prev' => 'ERR', 'diff' => 'ERR'];
+
+        $hasPrev = $currentIndex > 0;
+        $prevYear = $hasPrev ? (int)$kwList[$currentIndex - 1]['year'] : null;
+        $prevKW = $hasPrev ? (int)$kwList[$currentIndex - 1]['kw'] : null;
+
+        if ($hasPrev) {
+            $stmt = $openDbConnection->prepare("
+                SELECT platz 
+                FROM top40 
+                WHERE LOWER(titel) = LOWER(?) 
+                AND LOWER(interpret) = LOWER(?) 
+                AND jahr = ? 
+                AND kw = ?
+            ");
+            $stmt->bind_param("ssii", $title, $interpret, $prevYear, $prevKW);
+            $stmt->execute();
+            $stmt->bind_result($prevRank);
+            if ($stmt->fetch()) {
+                $stmt->close();
+                $diff = $prevRank - $currentRank;  // Reverse sign as desired
+                return ['prev' => $prevRank, 'diff' => (string)$diff];
             }
-        }
-
-        if (!$prevEntry) {
-            return ['prev' => 'NEW', 'diff' => 'NEW'];
-        }
-
-        $prevKW = (int)$prevEntry['kw'];
-        $prevYear = (int)$prevEntry['year'];
-
-        // 2. Song-Platzierung in der Vorwoche suchen
-        $stmt = $openDbConnection->prepare("
-            SELECT platz 
-            FROM top40 
-            WHERE LOWER(CONVERT(titel USING utf8mb4)) COLLATE utf8mb4_general_ci = LOWER(CONVERT(? USING utf8mb4)) COLLATE utf8mb4_general_ci
-            AND LOWER(CONVERT(interpret USING utf8mb4)) COLLATE utf8mb4_general_ci = LOWER(CONVERT(? USING utf8mb4)) COLLATE utf8mb4_general_ci
-            AND jahr = ? 
-            AND kw = ?
-        ");
-
-        if (!$stmt) {
-            return ['prev' => 'ERR', 'diff' => 'ERR'];
-        }
-
-        $stmt->bind_param("ssii", $title, $interpret, $prevYear, $prevKW);
-        $stmt->execute();
-        $stmt->bind_result($prevRank);
-
-        if ($stmt->fetch()) {
             $stmt->close();
-            $diff = $prevRank - $currentRank;
-            return [
-                'prev' => $prevRank,
-                'diff' => (string)$diff
-            ];
         }
 
-        $stmt->close();
-
-        // 3. Re-Entry prüfen
-       // Wenn nicht gefunden, prüfe auf Re-Entry:
+        // Find first week the song appeared
         $stmt2 = $openDbConnection->prepare("
-            SELECT COUNT(*) 
+            SELECT jahr, kw 
             FROM top40 
-            WHERE LOWER(CONVERT(titel USING utf8mb4)) COLLATE utf8mb4_general_ci = LOWER(CONVERT(? USING utf8mb4)) COLLATE utf8mb4_general_ci
-            AND LOWER(CONVERT(interpret USING utf8mb4)) COLLATE utf8mb4_general_ci = LOWER(CONVERT(? USING utf8mb4)) COLLATE utf8mb4_general_ci
-            AND (jahr < ? OR (jahr = ? AND kw < ?))
+            WHERE LOWER(titel) = LOWER(?) 
+            AND LOWER(interpret) = LOWER(?) 
+            ORDER BY jahr ASC, kw ASC 
+            LIMIT 1
         ");
-
-        if (!$stmt2) {
-            return ['prev' => 'ERR', 'diff' => 'ERR'];
-        }
-
-        $stmt2->bind_param("ssiii", $title, $interpret, $prevYear, $prevYear, $prevKW);
+        $stmt2->bind_param("ss", $title, $interpret);
         $stmt2->execute();
-        $stmt2->bind_result($count);
+        $stmt2->bind_result($firstYear, $firstKW);
         $stmt2->fetch();
         $stmt2->close();
 
-        if ($count > 0) {
-            return ['prev' => 'RE', 'diff' => 'RE'];
-        } else {
+        $firstDbYear = (int)$kwList[0]['year'];
+        $firstDbKW   = (int)$kwList[0]['kw'];
+
+        if ((int)$firstYear === (int)$year && (int)$firstKW === (int)$kw) {
             return ['prev' => 'NEW', 'diff' => 'NEW'];
         }
-        
-        if ($stmt->fetch()) {
-            $stmt->close();
-            
-            // Unterschied berechnen NUR wenn der Song auch in der Vorwoche war (kein Re-Entry)
-            $diff = $prevRank - $currentRank;
 
-            return [
-                'prev' => $prevRank,
-                'diff' => (string)$diff
-            ];
-        } else {
-            $stmt->close();
-
-            // Statt sofort 'NEW' prüfen ob RE
-            // (Re-Entry-Abfrage siehe oben)
-        }
-
-        if ($count > 0) {
-            return ['prev' => 'RE', 'diff' => 'RE'];
-        } else {
+        if ((int)$year === $firstDbYear && (int)$kw === $firstDbKW) {
             return ['prev' => 'NEW', 'diff' => 'NEW'];
         }
+
+        return ['prev' => 'RE', 'diff' => 'RE'];
     }
 
-
+    // Get label for previous week to display in table header
     function getPrevWeekLabel4Header($openDbConnection, $year, $kw) {
         $prevWeekInfo = getNextEarlierWeek($openDbConnection, $year, $kw);
         if ($prevWeekInfo) {
-            [$prevKW, $prevYear] = $prevWeekInfo;
+            [$prevYear, $prevKW] = $prevWeekInfo;
             $prevWeekLabel = "KW" . str_pad($prevKW, 2, '0', STR_PAD_LEFT) . " / " . $prevYear;
         } else {
-            $prevWeekLabel = "Keine Vorwoche";
+            $prevWeekLabel = "No previous week";
         }
         return $prevWeekLabel;
     }
 
-    // following code will be exeuted, because this is opened in browser, also e.g. every time again refresh
-    
     // open DB once
     $openDbConnection = getSqlConnection();
 
     $kwList = getKwList($openDbConnection);
+    // Sort kwList ascending by year and week, with leading zeros for weeks
     usort($kwList, function ($a, $b) {
         if ($a['year'] === $b['year']) {
-            return (int)$b['kw'] <=> (int)$a['kw'];
+            // If year is equal, sort ascending by week
+            return (int)$a['kw'] <=> (int)$b['kw'];
         }
-        return (int)$b['year'] <=> (int)$a['year'];
+        // Otherwise, sort ascending by year
+        return (int)$a['year'] <=> (int)$b['year'];
     });
 
-
-    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['kwYearDropDown'])) {
-        [$year, $kw] = explode('-', $_POST['kwYearDropDown']);
-        $year = (int)$year;
-        $kw = (int)$kw;
-    } else {
-        $latest = reset($kwList);
-        $year = (int)$latest['year'];
-        $kw = (int)$latest['kw'];
-    }
-
-
-    // Main logic depending on POST data
-    if (isset($_POST['kwYearDropDown'])) {
-
-    [$year, $kw] = explode('-', $_POST['kwYearDropDown']);
-    $kw = (int)$kw;
-
-    $data = getData4KW($openDbConnection, $year, $kw);
-
-        if (!empty($data)) {
-            getPrevWeekLabel4Header($openDbConnection, $year, $kw);
-        }
-
-        $selectedLabel = "$year / KW" . str_pad($kw, 2, '0', STR_PAD_LEFT);
-
-        $prevWeekLabel = getPrevWeekLabel4Header($openDbConnection, $year, $kw);
-
-    } else {
-            // Weekly view
-            if (isset($_POST['kwYearDropDown'])) {
-            // Split the selected value into year and week parts
-            [$year, $kw] = explode('-', $_POST['kwYearDropDown']);
-            $kw = (int)$kw; // Optional: Ensure the week (KW) is treated as an integer
-            } else {
-                $lastEntry = end($kwList);
-                $year = $lastEntry['year'];
-                $kw = (int)$lastEntry['kw'];
-            }
-
-            $kw = (int)$kw; // ensure integer
-            $data = getData4KW($openDbConnection, $year, $kw);
-
-            if (!empty($data)) {
-                getPrevWeekLabel4Header($openDbConnection, $year, $kw);
-            }
-            
-            // Get the name of the previous week to show in the header
-            $prevWeekLabel = getPrevWeekLabel4Header($openDbConnection, $year, $kw);
-
-    }
-
-    $selectedLabel = "$year / KW" . str_pad($kw, 2, '0', STR_PAD_LEFT);
-    // echo "<h1>Top 40 – $selectedLabel</h1>";
-
-    // calculate missing data (platz vorwoche, differenz)  by (titel, interpret)   
-
-    require_once 'SqlConnection.php';  // Für $openDbConnection (DB-Verbindung)
-    require_once 'functions.php';      // Für getKwList() und generateDropdown()
-
-    // KW-Liste holen
-    $kwList = getKwList($openDbConnection);
-
-    // Ausgewähltes Dropdown-Element aus POST
+    // Get selected week and year from POST or default to latest
     $selectedKw = $_POST['kwYearDropDown'] ?? null;
 
     if ($selectedKw) {
         [$year, $kw] = explode('-', $selectedKw);
+        $year = (int)$year;
         $kw = (int)$kw;
     } else {
-        $lastEntry = end($kwList);
-        $year = $lastEntry['year'];
-        $kw = (int)$lastEntry['kw'];
+        $latest = end($kwList);
+        $year = (int)$latest['year'];
+        $kw = (int)$latest['kw'];
     }
 
     $data = getData4KW($openDbConnection, $year, $kw);
 
     $prevWeekLabel = getPrevWeekLabel4Header($openDbConnection, $year, $kw);
-    // $selectedLabel = "KW" . str_pad($kw, 2, '0', STR_PAD_LEFT) . " / $year";
 
-    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        if (isset($_POST['kwYearDropDown'])) {
-            [$year, $kw] = explode('-', $_POST['kwYearDropDown']);
-            $kw = (int)$kw;
-            $year = (int)$year;
-        }
-        $selectedLabel = "KW" . str_pad($kw, 2, '0', STR_PAD_LEFT) . " / $year";
-    }
+    $selectedLabel = "$year / KW" . str_pad($kw, 2, '0', STR_PAD_LEFT);
 
     $showWarning = showWarningMessage($year, $kw, $openDbConnection);
 
 ?>
 
 <!-- HTML Code starts here ------------->
+
 <!DOCTYPE html>
 <html lang="de">
  <head>
@@ -405,7 +308,7 @@
 
         <div class="form-container">
             <form method="post" class="form-container">
-                <label for="kwYearDropDown">Wähle:</label>
+                <label for="kwYearDropDown">Choose:</label>
                 <select name="kwYearDropDown" id="kwYearDropDown" class="dropdown">
                     <?php foreach ($kwList as $entry): 
                         $isSelected = ($entry['year'] == $year && $entry['kw'] == $kw) ? 'selected' : '';
@@ -417,16 +320,17 @@
             </form>
         </div>
 
-        <?php
-            echo "<h1>Top 40 – $selectedLabel</h1>";
-        ?>
+        <?php if (!$showWarning): ?>
+            <h1>Top 40 – <?= htmlspecialchars($selectedLabel) ?></h1>
+        <?php endif; ?>
+
 
         <?php if ($showWarning): ?>
             <div class="warning">Keine Daten der Vorwoche vorhanden!</div>
         <?php else: ?>
             <table>
                 <tr>
-                    <th>Platz</th><th>Titel</th><th>Interpret</th>
+                    <th>Rank</th><th>Title</th><th>Artist</th>
                     <th><?= htmlspecialchars($prevWeekLabel) ?></th><th>Diff.</th>
                 </tr>
                 <?php foreach ($data as $row): ?>
