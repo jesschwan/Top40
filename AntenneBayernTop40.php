@@ -23,7 +23,6 @@
         echo "</tr>";
     }
 
-
     $data = []; // Default value to avoid errors
 
     function getData4KW($openDbConnection, $year, $kw) {
@@ -87,7 +86,7 @@
             return null;
         }
 
-        $stmt->bind_param("iii", $year, $year, $kw);
+        $stmt->bind_param("iii", $year, $year, $kw); // first ? --> $year (for jahr < ?), second ? --> $year (for jahr = ?), third ? --> $kw (for kw < ?)
         $stmt->execute();
         $stmt->bind_result($prevYear, $prevKw);
 
@@ -205,7 +204,7 @@
 
     $prevWeekLabel = getPrevWeekLabel4Header($openDbConnection, $year, $kw);
 
-    $selectedLabel = "$year / KW" . str_pad($kw, 2, '0', STR_PAD_LEFT);
+    $selectedLabel = "KW" . str_pad($kw, 2, '0', STR_PAD_LEFT) . " / $year";
 
     $showWarning = showWarningMessage($year, $kw, $openDbConnection);
 
@@ -215,7 +214,7 @@
 
 <!DOCTYPE html>
 <html lang="de">
- <head>
+    <head>
         <meta charset="UTF-8">
         <title>Top 40</title>
         <style>
@@ -308,7 +307,7 @@
 
         <div class="form-container">
             <form method="post" class="form-container">
-                <label for="kwYearDropDown">Choose:</label>
+                <label for="kwYearDropDown">Wähle:</label>
                 <select name="kwYearDropDown" id="kwYearDropDown" class="dropdown">
                     <?php foreach ($kwList as $entry): 
                         $isSelected = ($entry['year'] == $year && $entry['kw'] == $kw) ? 'selected' : '';
@@ -330,7 +329,7 @@
         <?php else: ?>
             <table>
                 <tr>
-                    <th>Rank</th><th>Title</th><th>Artist</th>
+                    <th>Platz</th><th>Titel</th><th>Interpret</th>
                     <th><?= htmlspecialchars($prevWeekLabel) ?></th><th>Diff.</th>
                 </tr>
                 <?php foreach ($data as $row): ?>
