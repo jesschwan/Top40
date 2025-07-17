@@ -66,12 +66,6 @@
         return $KWDataArray;
     }
 
-    // Show warning message if there is no previous week data
-    function showWarningMessage($year, $kw, $openDbConnection) {
-        $prev = getNextEarlierWeek($openDbConnection, $year, $kw);
-        return !$prev; // Returns TRUE if NO previous week exists
-    }
-
     // Returns the next earlier week available in the DB, given a year and week
     function getNextEarlierWeek($openDbConnection, $year, $kw) {
         $stmt = $openDbConnection->prepare("
@@ -98,6 +92,12 @@
 
         $stmt->close();
         return null;
+    }
+
+    // Show warning message if there is no previous week data
+    function showWarningMessage($openDbConnection, $year, $kw) {
+        $prev = getNextEarlierWeek($openDbConnection, $year, $kw);
+        return !$prev; // Returns TRUE if NO previous week exists
     }
 
     // Get previous week's rank and difference for a given song and current rank
@@ -206,7 +206,7 @@
 
     $selectedLabel = "KW" . str_pad($kw, 2, '0', STR_PAD_LEFT) . " / $year";
 
-    $showWarning = showWarningMessage($year, $kw, $openDbConnection);
+    $showWarning = showWarningMessage($openDbConnection, $year, $kw);
 
 ?>
 
@@ -222,31 +222,40 @@
                 font-family: Arial, sans-serif;
                 text-align: center;
                 padding-top: 25px;
+                background-color: white;
                 margin: 0;
             }
             h1 {
-                font-size: 40px;
+                font-size: 45px;
                 position: sticky;
                 top: 0;
-                background-color: white;
                 border-bottom: 1px solid lightgrey;
-                margin: 0;
                 padding: 10px;
+                background-color: white;
+                margin: 0;
                 z-index: 10;
+            }
+            .warning {
+                color: red;
+                font-size: 50px;
+                font-weight: bold;
+                margin: 20px 0;
+                text-align: center;
             }
             table {
                 margin: auto;
                 border-collapse: collapse;
-                font-size: 25px;
+                font-size: 30px;
                 width: auto;
                 color: black;
+                background: white;
             }
             th, td {
                 border: 2px solid black;
                 padding: 10px;
             }
             th {
-                background-color: blue;
+                background-color: rgb(0, 0, 255);
                 color: black;
                 position: sticky;
                 top: 55px;
@@ -255,7 +264,7 @@
             }
             tr td:first-child {
                 font-weight: bold;
-                background-color: blue;
+                background-color: rgb(0, 0, 255);
                 color: black;
                 text-align: center;
             }
@@ -273,32 +282,36 @@
                 gap: 20px;
                 margin-bottom: 30px;
             }
+            .dropdown, button, label {
+                font-size: 30px;
+                font-family: Arial;
+                color: black;
+                height: 50px;
+                padding: 0 20px;
+            }
+            .dropdown, button {
+                cursor: pointer;
+            }
+            button, label {
+               font-weight: bold;
+            }
+            .dropdown, label {
+                background-color: white;
+            }
+            .dropdown {
+                border: 1px solid black;
+            }
+            button {
+                background-color: #b4b4b4;
+                border: 2px solid black;
+            }
             label {
-                font-size: 25px;
+                font-weight: bold;
                 color: black;
                 font-family: Arial;
                 display: flex;
                 align-items: center;
                 height: 50px;
-            }
-            .dropdown, button {
-                font-size: 25px;
-                color: black;
-                font-family: Arial;
-                height: 50px;
-                padding: 0 20px;
-            }
-            button {
-                background-color: #ccc;
-                border: 2px solid black;
-                cursor: pointer;
-            }
-            .warning {
-                color: red;
-                font-size: 50px;
-                font-weight: bold;
-                margin: 20px 0;
-                text-align: center;
             }
         </style>
     </head>
