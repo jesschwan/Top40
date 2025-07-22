@@ -65,12 +65,12 @@
         return $KWDataArray;
     }
 
-    // Returns the next earlier week available in the DB, given a year and week
+    // Returns the next earlier year and week available in the DB, given a year and week
     function getNextEarlierWeek($openDbConnection, $year, $kw) {
         $stmt = $openDbConnection->prepare("
             SELECT jahr, kw 
             FROM top40 
-            WHERE (jahr < ? OR (jahr = ? AND kw < ?)) 
+            WHERE (jahr <= ? AND kw < ?)) 
             GROUP BY jahr, kw 
             ORDER BY jahr DESC, kw DESC 
             LIMIT 1
@@ -79,7 +79,7 @@
             return null;
         }
 
-        $stmt->bind_param("iii", $year, $year, $kw); // first ? --> $year (for jahr < ?), second ? --> $year (for jahr = ?), third ? --> $kw (for kw < ?)
+        $stmt->bind_param("ii", $year, $kw); // first ? --> $year (for jahr < ?), second ? --> $year (for jahr = ?), third ? --> $kw (for kw < ?)
         // $year is passed twice — this is required since both conditions filter by year
         $stmt->execute();
         $stmt->bind_result($prevYear, $prevKw);
