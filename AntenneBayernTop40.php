@@ -56,7 +56,6 @@
                     'titel' => $row["titel"],
                     'interpret' => $row["interpret"],
                     'kw' => $row["kw"],
-                    // You can add more fields if needed
                 ];
             }
             $currentRank = $row["platz"];
@@ -81,6 +80,7 @@
         }
 
         $stmt->bind_param("iii", $year, $year, $kw); // first ? --> $year (for jahr < ?), second ? --> $year (for jahr = ?), third ? --> $kw (for kw < ?)
+        // $year is passed twice — this is required since both conditions filter by year
         $stmt->execute();
         $stmt->bind_result($prevYear, $prevKw);
 
@@ -103,14 +103,14 @@
     // Get previous week's rank and difference for a given song and current rank
     function getPreviousWeekData($title, $interpret, $year, $kw, $currentRank, $openDbConnection, $kwList) {
         // Check KW formatting in kwList, best like this:
-        $searchKey = $year . '-' . str_pad($kw, 2, '0', STR_PAD_LEFT);
-        $mappedKeys = array_map(fn($e) => $e['year'] . '-' . str_pad($e['kw'], 2, '0', STR_PAD_LEFT), $kwList);
-        $currentIndex = array_search($searchKey, $mappedKeys);
-        if ($currentIndex === false) return ['prev' => 'ERR', 'diff' => 'ERR'];
+        $searchKey = $year . '-' . str_pad($kw, 2, '0', STR_PAD_LEFT); // Combination of title and artist as search key
+        $mappedKeys = array_map(fn($e) => $e['year'] . '-' . str_pad($e['kw'], 2, '0', STR_PAD_LEFT), $kwList); // Array of all songs from the previous week
+        $currentIndex = array_search($searchKey, $mappedKeys); // Current position of the song this week
+        if ($currentIndex === false) return ['prev' => 'ERR', 'diff' => 'ERR']; 
 
-        $hasPrev = $currentIndex > 0;
-        $prevYear = $hasPrev ? (int)$kwList[$currentIndex - 1]['year'] : null;
-        $prevKW = $hasPrev ? (int)$kwList[$currentIndex - 1]['kw'] : null;
+        $hasPrev = $currentIndex > 0; // If any data from last week is available
+        $prevYear = $hasPrev ? (int)$kwList[$currentIndex - 1]['year'] : null; // Previous year
+        $prevKW = $hasPrev ? (int)$kwList[$currentIndex - 1]['kw'] : null; // Previous KW
 
         if ($hasPrev) {
             $stmt = $openDbConnection->prepare("
@@ -150,11 +150,11 @@
         $firstDbYear = (int)$kwList[0]['year'];
         $firstDbKW   = (int)$kwList[0]['kw'];
 
-        if ((int)$firstYear === (int)$year && (int)$firstKW === (int)$kw) {
+        if ((int)$firstYear === (int)$year && (int)$firstKW === (int)$kw) { // Year and calendar week of the current week
             return ['prev' => 'NEW', 'diff' => 'NEW'];
         }
 
-        if ((int)$year === $firstDbYear && (int)$kw === $firstDbKW) {
+        if ((int)$year === $firstDbYear && (int)$kw === $firstDbKW) { // First (oldest) week in the database
             return ['prev' => 'NEW', 'diff' => 'NEW'];
         }
 
@@ -255,7 +255,7 @@
                 padding: 10px;
             }
             th {
-                background-color: rgb(0, 0, 255);
+                background-color: rgb(0, 0, 205);
                 color: black;
                 position: sticky;
                 top: 55px;
@@ -264,7 +264,7 @@
             }
             tr td:first-child {
                 font-weight: bold;
-                background-color: rgb(0, 0, 255);
+                background-color: rgb(0, 0, 205);
                 color: black;
                 text-align: center;
             }
@@ -313,6 +313,15 @@
                 align-items: center;
                 height: 50px;
             }
+            .diff-up {
+            color: green;
+            font-weight: bold;
+            }
+            .diff-down {
+                color: red;
+                font-weight: bold;
+            }
+
         </style>
     </head>
 
