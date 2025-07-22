@@ -95,13 +95,13 @@
     }
 
     // Show warning message if there is no previous week data
-    function showWarningMessage($openDbConnection, $year, $kw) {
+    function hasNoPreviousWeek($openDbConnection, $year, $kw) {
         $prev = getNextEarlierWeek($openDbConnection, $year, $kw);
         return !$prev; // Returns TRUE if NO previous week exists
     }
 
     // Get previous week's rank and difference for a given song and current rank
-    function getPreviousWeekData($title, $interpret, $year, $kw, $currentRank, $openDbConnection, $kwList) {
+    function getPreviousChartPosition($title, $interpret, $year, $kw, $currentRank, $openDbConnection, $kwList) {
         // Check KW formatting in kwList, best like this:
         $searchKey = $year . '-' . str_pad($kw, 2, '0', STR_PAD_LEFT); // Combination of title and artist as search key
         $mappedKeys = array_map(fn($e) => $e['year'] . '-' . str_pad($e['kw'], 2, '0', STR_PAD_LEFT), $kwList); // Array of all songs from the previous week
@@ -206,7 +206,7 @@
 
     $selectedLabel = "KW" . str_pad($kw, 2, '0', STR_PAD_LEFT) . " / $year";
 
-    $showWarning = showWarningMessage($openDbConnection, $year, $kw);
+    $showWarning = hasNoPreviousWeek($openDbConnection, $year, $kw);
 
 ?>
 
@@ -359,7 +359,7 @@
                         $platz = $row['platz'];
                         $title = $row['titel'];
                         $interpret = $row['interpret'];
-                        $previousData = getPreviousWeekData($title, $interpret, $year, $kw, $platz, $openDbConnection, $kwList);
+                        $previousData = getPreviousChartPosition($title, $interpret, $year, $kw, $platz, $openDbConnection, $kwList);
                         renderTableRow($platz, $title, $interpret, $previousData['prev'], $previousData['diff']);
                     ?>
                 <?php endforeach; ?>
