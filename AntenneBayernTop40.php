@@ -67,32 +67,31 @@
 
     // Returns the next earlier year and week available in the DB, given a year and week
     function getNextEarlierWeek($openDbConnection, $year, $kw) {
-        $stmt = $openDbConnection->prepare("
+        $current = $year * 100 + $kw;
+
+        $stmt = $openDbConnection->prepare(" 
             SELECT jahr, kw 
             FROM top40 
-            WHERE (jahr <= ? AND kw < ?)) 
-            GROUP BY jahr, kw 
+            WHERE (jahr * 100 + kw) < ? 
             ORDER BY jahr DESC, kw DESC 
             LIMIT 1
         ");
-        if (!$stmt) {
-            return null;
-        }
+        // WHERE (jahr * 100 + kw) < ?  -- Combines year and week into one number (e.g. 202523) to make it easier to compare dates
+        if (!$stmt) return null;
 
-        $stmt->bind_param("ii", $year, $kw); // first ? --> $year (for jahr < ?), second ? --> $year (for jahr = ?), third ? --> $kw (for kw < ?)
-        // $year is passed twice — this is required since both conditions filter by year
+        $stmt->bind_param("i", $current);
         $stmt->execute();
         $stmt->bind_result($prevYear, $prevKw);
 
         if ($stmt->fetch()) {
             $stmt->close();
-            // **HERE CORRECTION: Return order correctly (year, KW)**
             return [$prevYear, $prevKw];
         }
 
         $stmt->close();
         return null;
     }
+
 
     // Show warning message if there is no previous week data
     function hasNoPreviousWeek($openDbConnection, $year, $kw) {
