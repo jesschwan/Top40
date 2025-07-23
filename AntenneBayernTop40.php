@@ -2,13 +2,53 @@
     require "SqlConnection.php";
     require "functions.php";
 
-    // Render a table row for yearly or weekly view
+    function sanitizeFilename($string) {
+        // Remove all unwanted characters except letters, numbers, spaces, hyphens, and underscores
+        $clean = preg_replace('/[^A-Za-z0-9 _\-]/', '', $string);
+
+        // Replace multiple spaces with a single space
+        $clean = preg_replace('/\s+/', ' ', $clean);
+
+        // Replace spaces with underscores
+        $clean = str_replace(' ', '_', $clean);
+
+        // Trim leading and trailing whitespace
+        return trim($clean);
+    }
+
     function renderTableRow($platz, $title, $interpret, $vorw = null, $diff = null) {
+        // Build filename from title and artist
+        $filename = $title . ' - ' . $interpret . '.jpg';
+
+        // Filesystem path to check if file exists
+        $filepath = __DIR__ . '/images/' . $filename;
+
+        // Web path for HTML (use rawurlencode to handle spaces and special characters)
+        $coverPath = 'images/' . rawurlencode($filename);
+
+        // Check if image exists
+        $bildGefunden = file_exists($filepath);
+
+        // Debug output to help check filenames
+        echo "<!-- Debug filename: $filename -->";
+
+        // Start table row
         echo "<tr>
-                <td>$platz</td>
-                <td>$title</td>
-                <td>$interpret</td>";
-        
+            <td>$platz</td>
+            <td>$title</td>
+            <td>$interpret</td>
+            <td>";
+
+        // Show image if found, otherwise display warning
+        if ($bildGefunden) {
+            echo "<img src=\"$coverPath\" alt=\"Cover\" width=\"100\">";
+        } else {
+            echo "<span style='color:red;'>Kein Bild gefunden</span>"; // German: "No image found"
+        }
+
+        echo "</td>";
+
+        // Show previous week's position and difference (if available)
         if ($vorw !== null && $diff !== null) {
             $diffClass = '';
             if (is_numeric($diff)) {
@@ -17,9 +57,11 @@
             }
             echo "<td>$vorw</td><td$diffClass>$diff</td>";
         } else {
+            // Empty cells if no previous week data
             echo "<td></td><td></td>";
         }
 
+        // End table row
         echo "</tr>";
     }
 
@@ -312,7 +354,7 @@
                 align-items: center;
                 height: 50px;
             }
-            .diff-up {
+           .diff-up {
             color: green;
             font-weight: bold;
             }
@@ -320,7 +362,6 @@
                 color: red;
                 font-weight: bold;
             }
-
         </style>
     </head>
 
@@ -350,7 +391,7 @@
         <?php else: ?>
             <table>
                 <tr>
-                    <th>Platz</th><th>Titel</th><th>Interpret</th>
+                    <th>Platz</th><th>Titel</th><th>Interpret</th><th>Cover</th>
                     <th><?= htmlspecialchars($prevWeekLabel) ?></th><th>Diff.</th>
                 </tr>
                 <?php foreach ($data as $row): ?>
