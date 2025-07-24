@@ -23,8 +23,9 @@
         // Filesystem path to check if file exists
         $filepath = __DIR__ . '/images/' . $filename;
 
-        // Web path for HTML (use rawurlencode to handle spaces and special characters)
-        $coverPath = 'images/' . rawurlencode($filename);
+        // Web path for HTML with cache-busting parameter
+        $coverPath = 'images/' . rawurlencode($filename) . '?v=' . time();
+
 
         // Check if image exists
         $bildGefunden = file_exists($filepath);
@@ -294,6 +295,10 @@
             th, td {
                 border: 2px solid black;
                 padding: 10px;
+            }
+            td {
+                height: 40px;
+                width: 100px;
             }
             th {
                 background-color: rgb(0, 0, 205);
