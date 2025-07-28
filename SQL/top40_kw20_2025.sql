@@ -7,8 +7,8 @@ INSERT INTO `top40` (`Platz`, `Titel`, `Interpret`, `kw`, `jahr`) VALUES ('6', '
 INSERT INTO `top40` (`Platz`, `Titel`, `Interpret`, `kw`, `jahr`) VALUES ('7', 'Nice To Meet You', 'Myles Smith', 20, 2025);
 INSERT INTO `top40` (`Platz`, `Titel`, `Interpret`, `kw`, `jahr`) VALUES ('8', 'Abracadabra', 'Lady Gaga', 20, 2025);
 INSERT INTO `top40` (`Platz`, `Titel`, `Interpret`, `kw`, `jahr`) VALUES ('9', 'That\'s So True', 'Gracie Abrams', 20, 2025);
-INSERT INTO `top40` (`Platz`, `Titel`, `Interpret`, `kw`, `jahr`) VALUES ('10', 'Slow Motion', 'Marshmello x  Jonas Brothers', 20, 2025);
-INSERT INTO `top40` (`Platz`, `Titel`, `Interpret`, `kw`, `jahr`) VALUES ('11', 'Flowers', 'Alle Farben x  Graham Candy x  Lahos', 20, 2025);
+INSERT INTO `top40` (`Platz`, `Titel`, `Interpret`, `kw`, `jahr`) VALUES ('10', 'Slow Motion', 'Marshmello x Jonas Brothers', 20, 2025);
+INSERT INTO `top40` (`Platz`, `Titel`, `Interpret`, `kw`, `jahr`) VALUES ('11', 'Flowers', 'Alle Farben x Graham Candy x Lahos', 20, 2025);
 INSERT INTO `top40` (`Platz`, `Titel`, `Interpret`, `kw`, `jahr`) VALUES ('12', 'Messy', 'Lola Young', 20, 2025);
 INSERT INTO `top40` (`Platz`, `Titel`, `Interpret`, `kw`, `jahr`) VALUES ('13', 'Forever Young', 'David Guetta x Alphaville x Ava Max', 20, 2025);
 INSERT INTO `top40` (`Platz`, `Titel`, `Interpret`, `kw`, `jahr`) VALUES ('14', 'End Of The World', 'Miley Cyrus', 20, 2025);
@@ -35,6 +35,6 @@ INSERT INTO `top40` (`Platz`, `Titel`, `Interpret`, `kw`, `jahr`) VALUES ('34', 
 INSERT INTO `top40` (`Platz`, `Titel`, `Interpret`, `kw`, `jahr`) VALUES ('35', 'Dancing In The Flames', 'The Weeknd', 20, 2025);
 INSERT INTO `top40` (`Platz`, `Titel`, `Interpret`, `kw`, `jahr`) VALUES ('36', 'Anxiety', 'Doechii', 20, 2025);
 INSERT INTO `top40` (`Platz`, `Titel`, `Interpret`, `kw`, `jahr`) VALUES ('37', 'Blink Twice', 'Shaboozey feat. Myles Smith', 20, 2025);
-INSERT INTO `top40` (`Platz`, `Titel`, `Interpret`, `kw`, `jahr`) VALUES ('38', 'Control Of Me', 'Topic x  Daecolm', 20, 2025);
+INSERT INTO `top40` (`Platz`, `Titel`, `Interpret`, `kw`, `jahr`) VALUES ('38', 'Control Of Me', 'Topic x Daecolm', 20, 2025);
 INSERT INTO `top40` (`Platz`, `Titel`, `Interpret`, `kw`, `jahr`) VALUES ('39', 'The One', 'Michael Patrick Kelly', 20, 2025);
 INSERT INTO `top40` (`Platz`, `Titel`, `Interpret`, `kw`, `jahr`) VALUES ('40', 'Better Days', 'Glockenbach feat. Declan J Donovan', 20, 2025);

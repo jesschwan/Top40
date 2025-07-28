@@ -3,7 +3,7 @@ INSERT INTO `top40` (`Platz`, `Titel`, `Interpret`, `kw`, `jahr`) VALUES ('2', '
 INSERT INTO `top40` (`Platz`, `Titel`, `Interpret`, `kw`, `jahr`) VALUES ('3', 'By Your Side (In My Mind)', 'Leony', 17, 2025);
 INSERT INTO `top40` (`Platz`, `Titel`, `Interpret`, `kw`, `jahr`) VALUES ('4', 'Abracadabra', 'Lady Gaga', 17, 2025);
 INSERT INTO `top40` (`Platz`, `Titel`, `Interpret`, `kw`, `jahr`) VALUES ('5', 'Nice To Meet You', 'Myles Smith', 17, 2025);
-INSERT INTO `top40` (`Platz`, `Titel`, `Interpret`, `kw`, `jahr`) VALUES ('6', 'Slow Motion', 'Marshmello x  Jonas Brothers', 17, 2025);
+INSERT INTO `top40` (`Platz`, `Titel`, `Interpret`, `kw`, `jahr`) VALUES ('6', 'Slow Motion', 'Marshmello x Jonas Brothers', 17, 2025);
 INSERT INTO `top40` (`Platz`, `Titel`, `Interpret`, `kw`, `jahr`) VALUES ('7', 'Ray Of Light', 'Nico Santos', 17, 2025);
 INSERT INTO `top40` (`Platz`, `Titel`, `Interpret`, `kw`, `jahr`) VALUES ('8', 'Messy', 'Lola Young', 17, 2025);
 INSERT INTO `top40` (`Platz`, `Titel`, `Interpret`, `kw`, `jahr`) VALUES ('9', 'Forever Young', 'David Guetta x Alphaville x Ava Max', 17, 2025);
@@ -15,7 +15,7 @@ INSERT INTO `top40` (`Platz`, `Titel`, `Interpret`, `kw`, `jahr`) VALUES ('14', 
 INSERT INTO `top40` (`Platz`, `Titel`, `Interpret`, `kw`, `jahr`) VALUES ('15', 'Sorry I\'m Here For Someone Else', 'Benson Boone', 17, 2025);
 INSERT INTO `top40` (`Platz`, `Titel`, `Interpret`, `kw`, `jahr`) VALUES ('16', 'Wave', 'Fast Boy x Raf', 17, 2025);
 INSERT INTO `top40` (`Platz`, `Titel`, `Interpret`, `kw`, `jahr`) VALUES ('17', 'Bad Dreams', 'Teddy Swims', 17, 2025);
-INSERT INTO `top40` (`Platz`, `Titel`, `Interpret`, `kw`, `jahr`) VALUES ('18', 'Flowers', 'Alle Farben x  Graham Candy x  Lahos', 17, 2025);
+INSERT INTO `top40` (`Platz`, `Titel`, `Interpret`, `kw`, `jahr`) VALUES ('18', 'Flowers', 'Alle Farben x Graham Candy x Lahos', 17, 2025);
 INSERT INTO `top40` (`Platz`, `Titel`, `Interpret`, `kw`, `jahr`) VALUES ('19', 'Broken Sunshine', 'Michael Schulte', 17, 2025);
 INSERT INTO `top40` (`Platz`, `Titel`, `Interpret`, `kw`, `jahr`) VALUES ('20', 'Ordinary', 'Alex Warren', 17, 2025);
 INSERT INTO `top40` (`Platz`, `Titel`, `Interpret`, `kw`, `jahr`) VALUES ('21', 'A Bar Song (Tipsy)', 'Shaboozey', 17, 2025);
@@ -32,7 +32,7 @@ INSERT INTO `top40` (`Platz`, `Titel`, `Interpret`, `kw`, `jahr`) VALUES ('31', 
 INSERT INTO `top40` (`Platz`, `Titel`, `Interpret`, `kw`, `jahr`) VALUES ('32', 'Left In Your Love', 'Loi', 17, 2025);
 INSERT INTO `top40` (`Platz`, `Titel`, `Interpret`, `kw`, `jahr`) VALUES ('33', 'Austin (Boots Stop Workin\')', 'Dasha', 17, 2025);
 INSERT INTO `top40` (`Platz`, `Titel`, `Interpret`, `kw`, `jahr`) VALUES ('34', 'Love Is The Only Thing', 'Lost Frequencies', 17, 2025);
-INSERT INTO `top40` (`Platz`, `Titel`, `Interpret`, `kw`, `jahr`) VALUES ('35', 'Control Of Me', 'Topic x  Daecolm', 17, 2025);
+INSERT INTO `top40` (`Platz`, `Titel`, `Interpret`, `kw`, `jahr`) VALUES ('35', 'Control Of Me', 'Topic x Daecolm', 17, 2025);
 INSERT INTO `top40` (`Platz`, `Titel`, `Interpret`, `kw`, `jahr`) VALUES ('36', 'Con Calma', 'Alvaro Soler', 17, 2025);
 INSERT INTO `top40` (`Platz`, `Titel`, `Interpret`, `kw`, `jahr`) VALUES ('37', 'Anthem', 'Glockenbach feat. Norma Jean Martine', 17, 2025);
 INSERT INTO `top40` (`Platz`, `Titel`, `Interpret`, `kw`, `jahr`) VALUES ('38', 'Lost Your Faith', 'Ava Max', 17, 2025);
