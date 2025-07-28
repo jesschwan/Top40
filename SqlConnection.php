@@ -12,7 +12,7 @@ function getSqlConnection() {
     global $sqlHost, $sqlUser, $sqlPassword, $sqlDB; // makes externally defined variables available 
 
     // connect with localhost
-    $dbConn = new mysqli($sqlHost, $sqlUser, $sqlPassword, $sqlDB);
+    $dbConn = new mysqli($sqlHost, $sqlUser, $sqlPassword, $sqlDB, 3306);
 
     if ($dbConn->connect_error) {
         die('Could not connect to database: ' . $dbConn->connect_error);
@@ -20,5 +20,5 @@ function getSqlConnection() {
 
     return $dbConn;
 }
-// mysql_close($dbConn); --> do close by caller, if connection not needed any longer
+// $openDbConnection->close(); --> do close by caller, if connection not needed any longer
 ?>

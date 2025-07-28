@@ -3,26 +3,39 @@ require "SqlConnection.php";
 
 $db = getSqlConnection();
 
+// Get all unique title-artist combinations from the top40 table
 $sql = "SELECT DISTINCT titel, interpret FROM top40";
 $result = $db->query($sql);
 
 $counter = 0;
 $notFound = [];
 
-echo "<!DOCTYPE html><html lang='de'><head><meta charset='UTF-8'><title>Cover-Update</title></head><body>";
-echo "<h2>🎵 Cover-Update für Top40</h2>";
+echo "<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'><title>Cover Update</title></head><body>";
+echo "<h2>🎵 Cover Update for Top40</h2>";
+
+function normalize($str) {
+    $str = trim($str);
+    $str = mb_strtolower($str);
+    $str = str_replace(['ß'], ['ss'], $str);
+    $str = str_replace(['&'], ['and'], $str);
+    $str = preg_replace('/\s+/', ' ', $str);
+    return $str;
+}
 
 while ($row = $result->fetch_assoc()) {
-    $titel = trim($row['titel']);
-    $interpret = trim($row['interpret']);
+    $titelRaw = trim($row['titel']);
+    $interpretRaw = trim($row['interpret']);
 
-    // Dateinamen konstruieren
-    $filename = $titel . ' - ' . $interpret . '.jpg';
+    $titel = normalize($titelRaw);
+    $interpret = normalize($interpretRaw);
+
+    // Construct the expected filename using ORIGINAL strings!
+    $filename = $titelRaw . ' - ' . $interpretRaw . '.jpg';
     $filepath = __DIR__ . '/images/' . $filename;
 
-    // Prüfe auch .JPG als Fallback
+    // Check uppercase .JPG fallback using ORIGINAL strings!
     if (!file_exists($filepath)) {
-        $filenameAlt = $titel . ' - ' . $interpret . '.JPG';
+        $filenameAlt = $titelRaw . ' - ' . $interpretRaw . '.JPG';
         $filepathAlt = __DIR__ . '/images/' . $filenameAlt;
         if (file_exists($filepathAlt)) {
             $filename = $filenameAlt;
@@ -31,45 +44,36 @@ while ($row = $result->fetch_assoc()) {
     }
 
     if (file_exists($filepath)) {
-        // Verwende LIKE, um Unterschiede in Groß-/Kleinschreibung & Leerzeichen auszugleichen
-        $titelLike = "%" . $db->real_escape_string($titel) . "%";
-        $interpretLike = "%" . $db->real_escape_string($interpret) . "%";
-
-        $stmt = $db->prepare("UPDATE top40 SET cover = ? WHERE titel LIKE ? AND interpret LIKE ?");
+        // Use exact match in SQL for better accuracy (using original strings)
+        $stmt = $db->prepare("UPDATE top40 SET cover = ? WHERE titel = ? AND interpret = ?");
         if (!$stmt) {
-            echo "<p style='color:red;'>❌ Fehler beim Vorbereiten des Statements: " . htmlspecialchars($db->error) . "</p>";
+            echo "<p style='color:red;'>❌ Error preparing statement: " . htmlspecialchars($db->error) . "</p>";
             continue;
         }
 
-        $stmt->bind_param("sss", $filename, $titelLike, $interpretLike);
+        $stmt->bind_param("sss", $filename, $titelRaw, $interpretRaw);
         $stmt->execute();
 
         if ($stmt->affected_rows > 0) {
             $counter++;
-            echo "<p style='color:green;'>✔ Cover eingetragen für: <strong>$titel</strong> - <em>$interpret</em></p>";
+            echo "<p style='color:green;'>✔ Cover updated for: <strong>" . htmlspecialchars($titelRaw) . "</strong> - <em>" . htmlspecialchars($interpretRaw) . "</em></p>";
         } else {
-            echo "<p style='color:orange;'>⚠ Kein Eintrag aktualisiert für: <strong>$titel</strong> - <em>$interpret</em></p>";
+            echo "<p style='color:orange;'>⚠ No entry updated for: <strong>" . htmlspecialchars($titelRaw) . "</strong> - <em>" . htmlspecialchars($interpretRaw) . "</em></p>";
         }
 
         $stmt->close();
     } else {
-        $notFound[] = $titel . ' - ' . $interpret;
+        $notFound[] = $titelRaw . ' - ' . $interpretRaw;
     }
+
+    // Debug output to show which entries are checked
+    echo "<p style='color:blue;'>🔍 Exact match search: <code>" . htmlspecialchars($titelRaw) . "</code> - <code>" . htmlspecialchars($interpretRaw) . "</code></p>";
 }
 
-// Debug: Zeigt an, ob überhaupt ein passender Datenbankeintrag existiert
-$titelLike = "%" . $db->real_escape_string($titel) . "%";
-$interpretLike = "%" . $db->real_escape_string($interpret) . "%";
-
-$check = $db->query("SELECT * FROM top40 WHERE titel LIKE '$titelLike' AND interpret LIKE '$interpretLike'");
-if ($check && $check->num_rows === 0) {
-    echo "<p style='color:gray;'>🔍 Kein DB-Treffer für: <code>$titelLike</code> / <code>$interpretLike</code></p>";
-}
-
-echo "<hr><p><strong>$counter</strong> Cover erfolgreich eingetragen.</p>";
+echo "<hr><p><strong>$counter</strong> covers successfully updated.</p>";
 
 if (!empty($notFound)) {
-    echo "<h3>🚫 Kein Bild gefunden für:</h3><ul>";
+    echo "<h3>🚫 No image found for:</h3><ul>";
     foreach ($notFound as $entry) {
         echo "<li>" . htmlspecialchars($entry) . "</li>";
     }

@@ -3,24 +3,24 @@
     require "functions.php";
 
     function sanitizeFilename($string) {
-        // Remove all unwanted characters except letters, numbers, spaces, hyphens, and underscores
-        $clean = preg_replace('/[^A-Za-z0-9 _\-]/', '', $string);
+        // Erlaubt: Buchstaben, Zahlen, Leerzeichen, Klammern, Bindestriche, Apostroph, Punkte, deutsche Umlaute
+        $clean = preg_replace('/[^A-Za-z0-9äöüÄÖÜß ()\'\-.,]/u', '', $string);
 
-        // Replace multiple spaces with a single space
+        // Mehrfache Leerzeichen auf eins reduzieren
         $clean = preg_replace('/\s+/', ' ', $clean);
 
-        // Replace spaces with underscores
-        $clean = str_replace(' ', '_', $clean);
-
-        // Trim leading and trailing whitespace
+        // Vorne und hinten trimmen
         return trim($clean);
     }
 
-    function renderTableRow($platz, $title, $interpret, $vorw = null, $diff = null) {
-        // Build filename from title and artist
-        $filename = $title . ' - ' . $interpret . '.jpg';
+    function renderTableRow($platz, $title, $interpret, $cover = null, $vorw = null, $diff = null) {
+        if ($cover) {
+            $filename = $cover;
+        } else {
+            // fallback falls kein Cover in DB steht
+            $filename = sanitizeFilename($title . ' - ' . $interpret) . '.jpg';
+        }
 
-        // Filesystem path to check if file exists
         $filepath = __DIR__ . '/images/' . $filename;
 
         // Web path for HTML with cache-busting parameter
@@ -71,40 +71,37 @@
     function getData4KW($openDbConnection, $year, $kw) {
         $KWDataArray = array();
 
-        // Prepare SQL query to select top 40 entries for the given year and week
-        $query = "SELECT * FROM top40 WHERE kw = ? AND jahr = ? ORDER BY platz LIMIT 40";
+        // SQL-Abfrage: Hole Platz, Titel, Interpret und Cover für Jahr und KW
+        $query = "SELECT platz, titel, interpret, cover FROM top40 WHERE kw = ? AND jahr = ? ORDER BY platz LIMIT 40";
 
-        // Prepare the SQL statement
         $stmt = $openDbConnection->prepare($query);
         if (!$stmt) {
             die("Error preparing the query: " . $openDbConnection->error);
         }
 
-        // Bind parameters to the SQL query to prevent SQL injection
         $stmt->bind_param("ii", $kw, $year);
-
-        // Execute the prepared statement
         $stmt->execute();
 
-        // Get the result set from the executed statement
         $result = $stmt->get_result();
 
         $currentRank = 0;
 
-        // Fetch each row as an associative array and build the data array
         while ($row = $result->fetch_assoc()) {
             if ($currentRank != $row["platz"]) {
                 $KWDataArray[] = [
                     'platz' => $row["platz"],
                     'titel' => $row["titel"],
                     'interpret' => $row["interpret"],
-                    'kw' => $row["kw"],
+                    'cover' => $row["cover"],  // Cover mitgeben
+                    'kw' => $kw,
+                    'jahr' => $year,
+                    // 'vorw' => null,  // Hier kannst du Vorwoche einfügen
+                    // 'diff' => null,  // Hier kannst du Diff einfügen
                 ];
             }
             $currentRank = $row["platz"];
         }
 
-        // Return the array of top 40 entries for the requested week and year
         return $KWDataArray;
     }
 
@@ -399,7 +396,7 @@
                     <th>Platz</th><th>Titel</th><th>Interpret</th><th>Cover</th>
                     <th><?= htmlspecialchars($prevWeekLabel) ?></th><th>Diff.</th>
                 </tr>
-                <?php foreach ($data as $row): ?>
+                
                     <?php
                         $platz = $row['platz'];
                         $title = $row['titel'];
