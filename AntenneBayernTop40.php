@@ -2,6 +2,7 @@
     require "SqlConnection.php";
     require "functions.php";
 
+    /*
     function sanitizeFilename($string) {
         // Erlaubt: Buchstaben, Zahlen, Leerzeichen, Klammern, Bindestriche, Apostroph, Punkte, deutsche Umlaute
         $clean = preg_replace('/[^A-Za-z0-9äöüÄÖÜß ()\'\-.,]/u', '', $string);
@@ -12,44 +13,40 @@
         // Vorne und hinten trimmen
         return trim($clean);
     }
+    */
 
     function renderTableRow($platz, $title, $interpret, $cover = null, $vorw = null, $diff = null) {
-        if ($cover) {
-            $filename = $cover;
+        // Wenn kein $cover gesetzt, direkt "Kein Bild gefunden" anzeigen
+        if (!$cover) {
+            $filename = null;
         } else {
-            // fallback falls kein Cover in DB steht
-            $filename = sanitizeFilename($title . ' - ' . $interpret) . '.jpg';
+            $filename = $cover;
         }
 
-        $filepath = __DIR__ . '/images/' . $filename;
+        if ($filename) {
+            $filepath = __DIR__ . '/images/' . $filename;
+            $bildGefunden = file_exists($filepath);
+            $coverPath = 'images/' . rawurlencode($filename) . '?v=' . time();
+        } else {
+            $bildGefunden = false;
+        }
 
-        // Web path for HTML with cache-busting parameter
-        $coverPath = 'images/' . rawurlencode($filename) . '?v=' . time();
+        echo "<!-- Debug filename: " . ($filename ?? 'null') . " -->";
 
-
-        // Check if image exists
-        $bildGefunden = file_exists($filepath);
-
-        // Debug output to help check filenames
-        echo "<!-- Debug filename: $filename -->";
-
-        // Start table row
         echo "<tr>
             <td>$platz</td>
             <td>$title</td>
             <td>$interpret</td>
             <td>";
 
-        // Show image if found, otherwise display warning
         if ($bildGefunden) {
             echo "<img src=\"$coverPath\" alt=\"Cover\" width=\"100\">";
         } else {
-            echo "<span style='color:red;'>Kein Bild gefunden</span>"; // German: "No image found"
+            echo "<span style='color:red;'>Kein Bild gefunden</span>";
         }
 
         echo "</td>";
 
-        // Show previous week's position and difference (if available)
         if ($vorw !== null && $diff !== null) {
             $diffClass = '';
             if (is_numeric($diff)) {
@@ -58,11 +55,9 @@
             }
             echo "<td>$vorw</td><td$diffClass>$diff</td>";
         } else {
-            // Empty cells if no previous week data
             echo "<td></td><td></td>";
         }
 
-        // End table row
         echo "</tr>";
     }
 
@@ -397,14 +392,19 @@
                     <th><?= htmlspecialchars($prevWeekLabel) ?></th><th>Diff.</th>
                 </tr>
                 
+                <?php foreach ($data as $row): ?>
                     <?php
                         $platz = $row['platz'];
                         $title = $row['titel'];
                         $interpret = $row['interpret'];
+                        $cover = $row['cover']; // falls du das Cover brauchst
+
                         $previousData = getPreviousChartPosition($title, $interpret, $year, $kw, $platz, $openDbConnection, $kwList);
-                        renderTableRow($platz, $title, $interpret, $previousData['prev'], $previousData['diff']);
+                        echo "<!-- Debug cover filename: " . htmlspecialchars($cover) . " -->";
+                        renderTableRow($platz, $title, $interpret, $cover, $previousData['prev'], $previousData['diff']);
                     ?>
                 <?php endforeach; ?>
+
             </table>
         <?php endif; ?>
 
