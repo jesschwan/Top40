@@ -1,72 +1,80 @@
 <?php
-    require "SqlConnection.php";
+    require_once "SqlConnection.php";
     require "functions.php";
 
-    /*
+    // Sanitizes a filename by allowing only letters, numbers, spaces, parentheses,
+    // hyphens, apostrophes, dots, and German umlauts. Removes other characters.
     function sanitizeFilename($string) {
-        // Erlaubt: Buchstaben, Zahlen, Leerzeichen, Klammern, Bindestriche, Apostroph, Punkte, deutsche Umlaute
+        // Allowed characters: letters, numbers, spaces, parentheses, hyphens, apostrophes, dots, German umlauts
         $clean = preg_replace('/[^A-Za-z0-9äöüÄÖÜß ()\'\-.,]/u', '', $string);
 
-        // Mehrfache Leerzeichen auf eins reduzieren
+        // Reduce multiple spaces to a single space
         $clean = preg_replace('/\s+/', ' ', $clean);
 
-        // Vorne und hinten trimmen
+        // Trim spaces from start and end
         return trim($clean);
     }
-    */
 
+    // Renders a table row with rank, title, artist, cover image, previous week position and difference
     function renderTableRow($platz, $title, $interpret, $cover = null, $vorw = null, $diff = null) {
-        // Wenn kein $cover gesetzt, direkt "Kein Bild gefunden" anzeigen
-        if (!$cover) {
-            $filename = null;
-        } else {
+        if ($cover) {
             $filename = $cover;
-        }
-
-        if ($filename) {
-            $filepath = __DIR__ . '/images/' . $filename;
-            $bildGefunden = file_exists($filepath);
-            $coverPath = 'images/' . rawurlencode($filename) . '?v=' . time();
         } else {
-            $bildGefunden = false;
+            // Fallback filename if no cover is set in DB
+            $filename = sanitizeFilename($title . ' - ' . $interpret) . '.jpg';
         }
 
-        echo "<!-- Debug filename: " . ($filename ?? 'null') . " -->";
+        $filepath = __DIR__ . '/images/' . $filename;
 
+        // Web path for HTML with cache-busting query parameter to avoid caching issues
+        $coverPath = 'images/' . rawurlencode($filename) . '?v=' . time();
+
+        // Check if image file exists on server
+        $imageFound = file_exists($filepath);
+
+        // Debug output to check filenames in HTML comments
+        echo "<!-- Debug filename: $filename -->";
+
+        // Start the table row
         echo "<tr>
             <td>$platz</td>
             <td>$title</td>
             <td>$interpret</td>
             <td>";
 
-        if ($bildGefunden) {
+        // Show image if found, else show warning message
+        if ($imageFound) {
             echo "<img src=\"$coverPath\" alt=\"Cover\" width=\"100\">";
         } else {
-            echo "<span style='color:red;'>Kein Bild gefunden</span>";
+            echo "<span style='color:red;'>Kein Bild gefunden</span>"; // "No image found"
         }
 
         echo "</td>";
 
+        // Show previous week's rank and difference if available
         if ($vorw !== null && $diff !== null) {
             $diffClass = '';
             if (is_numeric($diff)) {
-                if ($diff > 0) $diffClass = ' class="diff-up"';
-                elseif ($diff < 0) $diffClass = ' class="diff-down"';
+                if ($diff > 0) $diffClass = ' class="diff-up"';   // Green if rank improved
+                elseif ($diff < 0) $diffClass = ' class="diff-down"'; // Red if rank dropped
             }
             echo "<td>$vorw</td><td$diffClass>$diff</td>";
         } else {
+            // Empty cells if previous week data not available
             echo "<td></td><td></td>";
         }
 
+        // End table row
         echo "</tr>";
     }
 
-    $data = []; // Default value to avoid errors
+    $data = []; // Default value to avoid errors if no data is fetched
 
+    // Fetches chart data (rank, title, artist, cover) for a given year and calendar week
     function getData4KW($openDbConnection, $year, $kw) {
         $KWDataArray = array();
 
-        // SQL-Abfrage: Hole Platz, Titel, Interpret und Cover für Jahr und KW
+        // SQL query to get rank, title, artist, cover for specified year and week, ordered by rank
         $query = "SELECT platz, titel, interpret, cover FROM top40 WHERE kw = ? AND jahr = ? ORDER BY platz LIMIT 40";
 
         $stmt = $openDbConnection->prepare($query);
@@ -81,17 +89,17 @@
 
         $currentRank = 0;
 
+        // Loop through results and avoid duplicates for the same rank
         while ($row = $result->fetch_assoc()) {
             if ($currentRank != $row["platz"]) {
                 $KWDataArray[] = [
                     'platz' => $row["platz"],
                     'titel' => $row["titel"],
                     'interpret' => $row["interpret"],
-                    'cover' => $row["cover"],  // Cover mitgeben
+                    'cover' => $row["cover"],  // Pass cover filename
                     'kw' => $kw,
                     'jahr' => $year,
-                    // 'vorw' => null,  // Hier kannst du Vorwoche einfügen
-                    // 'diff' => null,  // Hier kannst du Diff einfügen
+                    // 'vorw' and 'diff' can be added here later if needed
                 ];
             }
             $currentRank = $row["platz"];
@@ -100,10 +108,11 @@
         return $KWDataArray;
     }
 
-    // Returns the next earlier year and week available in the DB, given a year and week
+    // Returns the next earlier year and calendar week available in the DB, given a year and week
     function getNextEarlierWeek($openDbConnection, $year, $kw) {
         $current = $year * 100 + $kw;
 
+        // Prepare SQL to find the closest earlier week than the current one
         $stmt = $openDbConnection->prepare(" 
             SELECT jahr, kw 
             FROM top40 
@@ -111,7 +120,8 @@
             ORDER BY jahr DESC, kw DESC 
             LIMIT 1
         ");
-        // WHERE (jahr * 100 + kw) < ?  -- Combines year and week into one number (e.g. 202523) to make it easier to compare dates
+        // Combining year and week into a single integer for easy comparison (e.g. 202523)
+
         if (!$stmt) return null;
 
         $stmt->bind_param("i", $current);
@@ -127,26 +137,30 @@
         return null;
     }
 
-
-    // Show warning message if there is no previous week data
+    // Returns TRUE if no previous week exists in DB for given year and week
     function hasNoPreviousWeek($openDbConnection, $year, $kw) {
         $prev = getNextEarlierWeek($openDbConnection, $year, $kw);
-        return !$prev; // Returns TRUE if NO previous week exists
+        return !$prev;
     }
 
-    // Get previous week's rank and difference for a given song and current rank
+    // Gets the previous week's rank and the difference in position for a given song and current rank
     function getPreviousChartPosition($title, $interpret, $year, $kw, $currentRank, $openDbConnection, $kwList) {
-        // Check KW formatting in kwList, best like this:
-        $searchKey = $year . '-' . str_pad($kw, 2, '0', STR_PAD_LEFT); // Combination of title and artist as search key
-        $mappedKeys = array_map(fn($e) => $e['year'] . '-' . str_pad($e['kw'], 2, '0', STR_PAD_LEFT), $kwList); // Array of all songs from the previous week
-        $currentIndex = array_search($searchKey, $mappedKeys); // Current position of the song this week
+        // Construct search key for current week
+        $searchKey = $year . '-' . str_pad($kw, 2, '0', STR_PAD_LEFT);
+
+        // Map all keys (year-week) in kwList to find the current position
+        $mappedKeys = array_map(fn($e) => $e['year'] . '-' . str_pad($e['kw'], 2, '0', STR_PAD_LEFT), $kwList);
+
+        $currentIndex = array_search($searchKey, $mappedKeys);
+
         if ($currentIndex === false) return ['prev' => 'ERR', 'diff' => 'ERR']; 
 
-        $hasPrev = $currentIndex > 0; // If any data from last week is available
-        $prevYear = $hasPrev ? (int)$kwList[$currentIndex - 1]['year'] : null; // Previous year
-        $prevKW = $hasPrev ? (int)$kwList[$currentIndex - 1]['kw'] : null; // Previous KW
+        $hasPrev = $currentIndex > 0;
+        $prevYear = $hasPrev ? (int)$kwList[$currentIndex - 1]['year'] : null;
+        $prevKW = $hasPrev ? (int)$kwList[$currentIndex - 1]['kw'] : null;
 
         if ($hasPrev) {
+            // Query DB for previous rank of the song
             $stmt = $openDbConnection->prepare("
                 SELECT platz 
                 FROM top40 
@@ -158,15 +172,16 @@
             $stmt->bind_param("ssii", $title, $interpret, $prevYear, $prevKW);
             $stmt->execute();
             $stmt->bind_result($prevRank);
+
             if ($stmt->fetch()) {
                 $stmt->close();
-                $diff = $prevRank - $currentRank;  // Reverse sign as desired
+                $diff = $prevRank - $currentRank;  // Calculate difference (positive if rank improved)
                 return ['prev' => $prevRank, 'diff' => (string)$diff];
             }
             $stmt->close();
         }
 
-        // Find first week the song appeared
+        // If no previous rank found, check if this is the first week the song appeared
         $stmt2 = $openDbConnection->prepare("
             SELECT jahr, kw 
             FROM top40 
@@ -184,18 +199,21 @@
         $firstDbYear = (int)$kwList[0]['year'];
         $firstDbKW   = (int)$kwList[0]['kw'];
 
-        if ((int)$firstYear === (int)$year && (int)$firstKW === (int)$kw) { // Year and calendar week of the current week
+        // If current week is the song's first appearance
+        if ((int)$firstYear === (int)$year && (int)$firstKW === (int)$kw) {
             return ['prev' => 'NEW', 'diff' => 'NEW'];
         }
 
-        if ((int)$year === $firstDbYear && (int)$kw === $firstDbKW) { // First (oldest) week in the database
+        // If current week is the oldest week in the DB but song appeared later
+        if ((int)$year === $firstDbYear && (int)$kw === $firstDbKW) {
             return ['prev' => 'NEW', 'diff' => 'NEW'];
         }
 
+        // Fallback return if no previous data found
         return ['prev' => 'RE', 'diff' => 'RE'];
     }
 
-    // Get label for previous week to display in table header
+    // Returns a label for the previous week, used in table header
     function getPrevWeekLabel4Header($openDbConnection, $year, $kw) {
         $prevWeekInfo = getNextEarlierWeek($openDbConnection, $year, $kw);
         if ($prevWeekInfo) {
@@ -207,21 +225,21 @@
         return $prevWeekLabel;
     }
 
-    // open DB once
+    // Open database connection once
     $openDbConnection = getSqlConnection();
 
+    // Retrieve list of all available calendar weeks from DB
     $kwList = getKwList($openDbConnection);
-    // Sort kwList ascending by year and week, with leading zeros for weeks
+
+    // Sort the list ascending by year and week (with leading zeros for week)
     usort($kwList, function ($a, $b) {
         if ($a['year'] === $b['year']) {
-            // If year is equal, sort ascending by week
             return (int)$a['kw'] <=> (int)$b['kw'];
         }
-        // Otherwise, sort ascending by year
         return (int)$a['year'] <=> (int)$b['year'];
     });
 
-    // Get selected week and year from POST or default to latest
+    // Get selected year and week from POST or default to the latest available
     $selectedKw = $_POST['kwYearDropDown'] ?? null;
 
     if ($selectedKw) {
@@ -234,12 +252,16 @@
         $kw = (int)$latest['kw'];
     }
 
+    // Fetch data for the selected year and week
     $data = getData4KW($openDbConnection, $year, $kw);
 
+    // Get label for previous week to show in table header
     $prevWeekLabel = getPrevWeekLabel4Header($openDbConnection, $year, $kw);
 
+    // Label for current selected week (e.g. "KW23 / 2025")
     $selectedLabel = "KW" . str_pad($kw, 2, '0', STR_PAD_LEFT) . " / $year";
 
+    // Flag to show warning if no previous week data available
     $showWarning = hasNoPreviousWeek($openDbConnection, $year, $kw);
 
 ?>
@@ -397,10 +419,8 @@
                         $platz = $row['platz'];
                         $title = $row['titel'];
                         $interpret = $row['interpret'];
-                        $cover = $row['cover']; // falls du das Cover brauchst
-
+                        $cover = $row['cover'];
                         $previousData = getPreviousChartPosition($title, $interpret, $year, $kw, $platz, $openDbConnection, $kwList);
-                        echo "<!-- Debug cover filename: " . htmlspecialchars($cover) . " -->";
                         renderTableRow($platz, $title, $interpret, $cover, $previousData['prev'], $previousData['diff']);
                     ?>
                 <?php endforeach; ?>
