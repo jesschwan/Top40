@@ -1,55 +1,7 @@
 <?php
+    require_once "Top40Entry.php";
     require_once "SqlConnection.php";
     require "functions.php";
-
-    // Allows only safe characters in filenames
-    function sanitizeFilename($string) {
-        $clean = preg_replace('/[^A-Za-z0-9äöüÄÖÜß ()\'\-.,]/u', '', $string);
-        $clean = preg_replace('/\s+/', ' ', $clean);
-        return trim($clean);
-    }
-
-    // Render one table row (rank, title, artist, cover, previous rank, diff)
-    function renderTableRow($platz, $title, $interpret, $cover = null, $vorw = null, $diff = null) {
-        if ($cover) {
-            $filename = $cover;
-        } else {
-            $filename = sanitizeFilename($title . ' - ' . $interpret) . '.jpg';
-        }
-
-        $filepath = __DIR__ . '/images/' . $filename;
-        $coverPath = 'images/' . rawurlencode($filename) . '?v=' . time();
-        $imageFound = file_exists($filepath);
-
-        echo "<!-- Debug filename: $filename -->";
-
-        echo "<tr>
-            <td>$platz</td>
-            <td>$title</td>
-            <td>$interpret</td>
-            <td>";
-
-        if ($imageFound) {
-            echo "<img src=\"$coverPath\" alt=\"Cover\" width=\"100\">";
-        } else {
-            echo "<span style='color:red;'>Kein Bild gefunden!</span>";
-        }
-
-        echo "</td>";
-
-        if ($vorw !== null && $diff !== null) {
-            $diffClass = '';
-            if (is_numeric($diff)) {
-                if ($diff > 0) $diffClass = ' class="diff-up"';
-                elseif ($diff < 0) $diffClass = ' class="diff-down"';
-            }
-            echo "<td>$vorw</td><td$diffClass>$diff</td>";
-        } else {
-            echo "<td></td><td></td>";
-        }
-
-        echo "</tr>";
-    }
 
     // Fetch chart data for a given year and week
     function getData4KW($openDbConnection, $year, $kw) {
@@ -406,7 +358,7 @@
                         $interpret = $row['interpret'];
                         $cover = $row['cover'];
                         $previousData = getPreviousChartPosition($title, $interpret, $year, $kw, $platz, $openDbConnection, $kwList);
-                        renderTableRow($platz, $title, $interpret, $cover, $previousData['prev'], $previousData['diff']);
+                        renderRow($platz, $title, $interpret, $cover, $previousData['prev'], $previousData['diff']);
                     ?>
                 <?php endforeach; ?>
 
