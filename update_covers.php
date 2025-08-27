@@ -1,5 +1,6 @@
 <?php
     require_once "SqlConnection.php";
+    require_once "Top40Entry.php";
     $db = getSqlConnection();
 
     // Select all titles and artists from the top40 table (no DISTINCT to catch all entries)
@@ -23,14 +24,6 @@
         return $str;
     }
 
-    // Sanitize string to safe filename, allow letters, numbers, some special chars, spaces
-    function sanitizeForFilename($string) {
-        // Allow only letters, digits, German umlauts, sharp s, spaces, and common punctuation
-        $clean = preg_replace('/[^A-Za-z0-9äöüÄÖÜß ()\'\-.,]/u', '', $string);
-        $clean = preg_replace('/\s+/', ' ', $clean); // Reduce multiple spaces to one
-        return trim($clean);
-    }
-
     // Iterate over all rows in the result
     while ($row = $result->fetch_assoc()) {
         $titelRaw = trim($row['titel']);
@@ -48,7 +41,7 @@
         $interpret = normalize($interpretRaw);
 
         // Create expected filename for the cover image
-        $filename = sanitizeForFilename($titelRaw . ' - ' . $interpretRaw) . '.jpg';
+        $filename = getSafeFilename($titelRaw . ' - ' . $interpretRaw) . '.jpg';
         $filepath = __DIR__ . '/images/' . $filename;
 
         // If the lowercase .jpg file doesn't exist, check for uppercase .JPG extension

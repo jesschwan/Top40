@@ -1,15 +1,6 @@
 <?php
     require_once "SqlConnection.php";
-
-    // Sanitize filename by removing forbidden Windows characters and reducing multiple spaces to one
-    function sanitizeFilename($string) {
-        // Remove forbidden Windows characters: \ / : * ? " < > |
-        $clean = preg_replace('/[\\\\\/:*?"<>|]/', '', $string);
-        // Reduce multiple spaces to one
-        $clean = preg_replace('/\s+/', ' ', $clean);
-        // Trim spaces at start and end
-        return trim($clean);
-    }
+    require_once "Top40Entry.php";
 
     // Open database connection
     $openDbConnection = getSqlConnection();
@@ -38,7 +29,7 @@
         $artist = $row['interpret'];
 
         // Generate expected sanitized filename: "title - artist.jpg"
-        $expectedFilename = sanitizeFilename("$title - $artist") . ".jpg";
+        $expectedFilename = getSafeFilename("$title - $artist") . ".jpg";
         $expectedPath = $folder . $expectedFilename;
 
         // Skip if expected file already exists
