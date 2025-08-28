@@ -6,7 +6,10 @@
     // Fetch chart data for a given year and week
     function getData4KW($openDbConnection, $year, $kw) {
         $KWDataArray = array();
-        $query = "SELECT platz, titel, interpret, cover FROM top40 WHERE kw = ? AND jahr = ? ORDER BY platz LIMIT 40";
+        $query = "SELECT platz, titel, interpret, cover 
+                FROM top40 
+                WHERE kw = ? AND jahr = ? 
+                ORDER BY platz LIMIT 40";
 
         $stmt = $openDbConnection->prepare($query);
         if (!$stmt) {
@@ -21,14 +24,14 @@
 
         while ($row = $result->fetch_assoc()) {
             if ($currentRank != $row["platz"]) {
-                $KWDataArray[] = [
-                    'platz' => $row["platz"],
-                    'titel' => $row["titel"],
-                    'interpret' => $row["interpret"],
-                    'cover' => $row["cover"],
-                    'kw' => $kw,
-                    'jahr' => $year,
-                ];
+                $KWDataArray[] = new Top40Entry(
+                    (int)$row["platz"],
+                    $row["titel"],
+                    $row["interpret"],
+                    $row["cover"],
+                    $kw,
+                    $year
+                );
             }
             $currentRank = $row["platz"];
         }
@@ -358,7 +361,6 @@
                         $interpret = $row['interpret'];
                         $cover = $row['cover'];
                         $previousData = getPreviousChartPosition($title, $interpret, $year, $kw, $platz, $openDbConnection, $kwList);
-                        renderRow($platz, $title, $interpret, $cover, $previousData['prev'], $previousData['diff']);
                     ?>
                 <?php endforeach; ?>
 
