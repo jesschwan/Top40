@@ -3,9 +3,9 @@
     require_once "SqlConnection.php";
     require "functions.php";
 
-    // Fetch chart data for a given year and week
-    function getData4KW($openDbConnection, $year, $kw) {
-        $KWDataArray = array();
+    function getData4KW($openDbConnection, $year, $kw, $kwList) {
+        $KWDataArray = [];
+
         $query = "SELECT platz, titel, interpret, cover 
                 FROM top40 
                 WHERE kw = ? AND jahr = ? 
@@ -24,7 +24,8 @@
 
         while ($row = $result->fetch_assoc()) {
             if ($currentRank != $row["platz"]) {
-                $KWDataArray[] = new Top40Entry(
+                // HIER speichern wir das Objekt in $entry
+                $entry = new Top40Entry(
                     (int)$row["platz"],
                     $row["titel"],
                     $row["interpret"],
@@ -32,6 +33,23 @@
                     $kw,
                     $year
                 );
+
+                // Vorwochen-Daten berechnen
+                $prev = getPreviousChartPosition(
+                    $entry->titel,
+                    $entry->interpret,
+                    $year,
+                    $kw,                // HIER fehlte vorher $kw
+                    $entry->platz,
+                    $openDbConnection,
+                    $kwList             // Übergabe war auch falsch
+                );
+
+                $entry->previousRank = $prev['prev'];
+                $entry->diff = $prev['diff'];
+
+                // in Array speichern
+                $KWDataArray[] = $entry;
             }
             $currentRank = $row["platz"];
         }
@@ -174,7 +192,7 @@
     }
 
     // Fetch data for selected week
-    $data = getData4KW($openDbConnection, $year, $kw);
+    $data = getData4KW($openDbConnection, $year, $kw, $kwList);
 
     // Previous week label
     $prevWeekLabel = getPrevWeekLabel4Header($openDbConnection, $year, $kw);
@@ -354,14 +372,8 @@
                     <th><?= htmlspecialchars($prevWeekLabel) ?></th><th>Diff.</th>
                 </tr>
                 
-                <?php foreach ($data as $row): ?>
-                    <?php
-                        $platz = $row['platz'];
-                        $title = $row['titel'];
-                        $interpret = $row['interpret'];
-                        $cover = $row['cover'];
-                        $previousData = getPreviousChartPosition($title, $interpret, $year, $kw, $platz, $openDbConnection, $kwList);
-                    ?>
+                <?php foreach ($data as $entry): ?>
+                    <?= $entry->renderRow() ?>
                 <?php endforeach; ?>
 
             </table>
