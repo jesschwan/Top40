@@ -1,78 +1,77 @@
 <?php
-    require_once "SqlConnection.php";
-    require_once "Top40Entry.php";
+require_once "SqlConnection.php";
+require_once "Top40Entry.php";
 
-    // Open database connection
-    $openDbConnection = getSqlConnection();
+// Open database connection
+$openDbConnection = getSqlConnection();
 
-    // Query distinct song titles and artists from the top40 table
-    $sql = "SELECT DISTINCT titel, interpret FROM top40";
-    $result = $openDbConnection->query($sql);
+// Query distinct song titles and artists
+$sql = "SELECT DISTINCT titel, interpret FROM top40";
+$result = $openDbConnection->query($sql);
+if (!$result) die("DB Error: " . $openDbConnection->error);
 
-    // Die if query fails, showing the DB error
-    if (!$result) die("DB-Fehler: " . $openDbConnection->error);
+$folder = __DIR__ . '/images/';
+$allFiles = array_merge(glob($folder . '*.jpg'), glob($folder . '*.JPG'));
 
-    // Define folder path where images are stored
-    $folder = __DIR__ . '/images/';
+$notMatched = [];
 
-    // Get all jpg files (case insensitive) in the folder
-    $allFiles = array_merge(glob($folder . '*.jpg'), glob($folder . '*.JPG'));
+echo "<h1>Bildvergleich – mögliche Übereinstimmungen</h1>";
 
-    $renamedCount = 0;   // Counter for renamed files (not used here, but reserved)
-    $notMatched = [];    // Array to hold titles/artists for which no matching file was found
+while ($row = $result->fetch_assoc()) {
+    $title = $row['titel'];
+    $artist = $row['interpret'];
 
-    echo "<h1>Bildvergleich – mögliche Übereinstimmungen</h1>";
+    // Use the single Top40Entry::getSafeFilename() path
+    $entry = new Top40Entry(0, $title, $artist, null, 0, 0);
+    $expectedFilename = $entry->getSafeFilename();
+    $expectedPath = $folder . $expectedFilename;
 
-    // Loop through each distinct song title and artist
-    while ($row = $result->fetch_assoc()) {
-        $title = $row['titel'];
-        $artist = $row['interpret'];
+    // Exact file exists?
+    if (file_exists($expectedPath)) {
+        echo "✅ Bild gefunden: <code>" . htmlspecialchars($expectedFilename) . "</code><br>";
+        continue;
+    }
 
-        // Generate expected sanitized filename: "title - artist.jpg"
-        $expectedFilename = getSafeFilename("$title - $artist") . ".jpg";
-        $expectedPath = $folder . $expectedFilename;
+    // Fallback: scan existing files and normalize each filename using the same getSafeFilename()
+    $matched = false;
+    foreach ($allFiles as $filePath) {
+        $basename = basename($filePath);
+        $nameNoExt = pathinfo($basename, PATHINFO_FILENAME);
 
-        // Skip if expected file already exists
-        if (file_exists($expectedPath)) continue;
+        // Normalize common dash variants to the ASCII hyphen so splitting works
+        $nameNoExt = str_replace(["–", "—", "−"], " - ", $nameNoExt);
 
-        $bestMatch = null;
-        $highestSimilarity = 0;
-
-        // Compare each file in the folder with expected "title - artist" string
-        foreach ($allFiles as $filePath) {
-            // Get filename without extension and replace underscores with spaces for better matching
-            $filename = basename($filePath);
-            $base = str_ireplace('_', ' ', pathinfo($filename, PATHINFO_FILENAME));
-            $target = "$title - $artist";
-
-            // Calculate similarity percentage between filename and target string
-            similar_text($base, $target, $percent);
-
-            // Update best match if similarity is above 70% and higher than previous best
-            if ($percent > $highestSimilarity && $percent > 70) {
-                $highestSimilarity = $percent;
-                $bestMatch = $filePath;
-            }
-        }
-
-        // Output possible match or warning if no match found
-        if ($bestMatch) {
-            echo "✅ Möglicher Treffer: <code>" . htmlspecialchars(basename($bestMatch)) . "</code> ➜ <code>$expectedFilename</code><br>";
+        if (strpos($nameNoExt, ' - ') !== false) {
+            list($fTitle, $fArtist) = explode(' - ', $nameNoExt, 2);
         } else {
-            echo "⚠️ Kein Match gefunden für: <strong>" . htmlspecialchars($title) . " - " . htmlspecialchars($artist) . "</strong><br>";
-            $notMatched[] = "$title - $artist";
+            // If no " - " found, treat whole filename as title
+            $fTitle = $nameNoExt;
+            $fArtist = '';
         }
 
-    }
+        $fileEntry = new Top40Entry(0, $fTitle, $fArtist, null, 0, 0);
+        $normalizedFileName = $fileEntry->getSafeFilename();
 
-    echo "<br><strong>Fertig!</strong> Abgleich abgeschlossen – keine Dateien wurden verändert.<br>";
-
-    // List all songs for which no matching image file was found
-    if (!empty($notMatched)) {
-        echo "<h3>Keine passenden Dateien gefunden für:</h3><ul>";
-        foreach ($notMatched as $nm) {
-            echo "<li>" . htmlspecialchars($nm) . "</li>";
+        if (strcasecmp($normalizedFileName, $expectedFilename) === 0) {
+            echo "✅ Bild gefunden (Fallback): <code>" . htmlspecialchars($basename) . "</code> — mapped to <code>" . htmlspecialchars($expectedFilename) . "</code><br>";
+            $matched = true;
+            break;
         }
-        echo "</ul>";
     }
+
+    if (!$matched) {
+        echo "⚠️ Keine Übereinstimmung gefunden für: <strong>" . htmlspecialchars($title) . " - " . htmlspecialchars($artist) . "</strong><br>";
+        $notMatched[] = "$title - $artist";
+    }
+}
+
+echo "<br><strong>Erledigt!</strong> Keine Dateien wurden verändert.<br>";
+
+if (!empty($notMatched)) {
+    echo "<h3>Keine Übereinstimmung gefunden für:</h3><ul>";
+    foreach ($notMatched as $nm) {
+        echo "<li>" . htmlspecialchars($nm) . "</li>";
+    }
+    echo "</ul>";
+}
 ?>
