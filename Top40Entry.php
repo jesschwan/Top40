@@ -18,14 +18,37 @@ class Top40Entry {
         $this->jahr = $jahr;
     }
 
-    // Safe filename for cover
+    /**
+     * Generate a safe filename for the cover image.
+     * Keeps apostrophes and normalizes typographic variants.
+     */
     public function getSafeFilename(): string {
-        $clean = preg_replace('/[^A-Za-z0-9äöüÄÖÜß ()\'\-.,]/u', '', $this->titel . ' - ' . $this->interpret);
-        $clean = preg_replace('/\s+/', ' ', $clean);
+        $str = $this->titel . ' - ' . $this->interpret;
+
+        // Normalize Unicode (NFC)
+        if (class_exists('Normalizer')) {
+            $str = Normalizer::normalize($str, Normalizer::FORM_C);
+        }
+
+        // Convert typographic apostrophes to simple '
+        $str = str_replace(["’", "‘", "`"], "'", $str);
+
+        // Remove control/format characters
+        $str = preg_replace('/[\p{Cc}\p{Cf}]+/u', '', $str);
+
+        // Allow letters, numbers, spaces, and some punctuation including apostrophes
+        $clean = preg_replace("/[^\p{L}\p{N} ()'\\-\\.,&!]/u", '', $str);
+
+        // Collapse multiple spaces
+        $clean = preg_replace('/\s+/u', ' ', $clean);
+
+        // Return trimmed filename with lowercase .jpg
         return trim($clean) . '.jpg';
     }
 
-    // HTML for a tablerow
+    /**
+     * Render a table row for this entry.
+     */
     public function renderRow(): string {
         $filename = $this->cover ?? $this->getSafeFilename();
         $filepath = __DIR__ . '/images/' . $filename;
@@ -38,7 +61,9 @@ class Top40Entry {
             elseif ($this->diff < 0) $diffClass = ' class="diff-down"';
         }
 
-        $coverHtml = $imageFound ? "<img src=\"$coverPath\" alt=\"Cover\" width=\"100\">" : "<span style='color:red;'>Kein Bild gefunden!</span>";
+        $coverHtml = $imageFound 
+            ? "<img src=\"$coverPath\" alt=\"Cover\" width=\"100\">" 
+            : "<span style='color:red;'>Kein Bild gefunden!</span>";
 
         $prev = $this->previousRank ?? '';
         $diff = $this->diff ?? '';
