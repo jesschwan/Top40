@@ -1,101 +1,64 @@
 <?php
-    require_once "SqlConnection.php";
-    require_once "Top40Entry.php";
-    $db = getSqlConnection();
+require_once "SqlConnection.php";
+require_once "Top40Entry.php";
 
-    // Select all titles and artists from the top40 table (no DISTINCT to catch all entries)
-    $sql = "SELECT titel, interpret FROM top40";
-    $result = $db->query($sql);
+$db = getSqlConnection();
 
-    $counter = 0;            // Count of successfully updated entries
-    $notFound = [];          // List of titles/artists for which no image file was found
-    $alreadyProcessed = [];  // Array to avoid processing duplicate title-artist combinations
+$sql = "SELECT titel, interpret FROM top40";
+$result = $db->query($sql);
 
-    echo "<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'><title>Cover Update</title></head><body>";
-    echo "<h2>🎵 Cover Update for Top40</h2>";
+$counterUpdated = 0;
+$counterCleared = 0;
+$alreadyProcessed = [];
 
-    $folder = __DIR__ . '/images/';
-    $allFiles = array_merge(glob($folder . '*.jpg'), glob($folder . '*.JPG'));
+echo "<!DOCTYPE html><html lang='de'><head><meta charset='UTF-8'><title>Cover Update</title></head><body>";
+echo "<h2>🎵 Cover Update for Top40</h2>";
 
-    while ($row = $result->fetch_assoc()) {
-        $titelRaw = trim($row['titel']);
-        $interpretRaw = trim($row['interpret']);
+$folder = __DIR__ . '/images/';
 
-        // Skip already processed title-artist combinations
-        $key = strtolower($titelRaw . '|' . $interpretRaw);
-        if (isset($alreadyProcessed[$key])) {
-            continue;
-        }
-        $alreadyProcessed[$key] = true;
+while ($row = $result->fetch_assoc()) {
+    $titelRaw = trim($row['titel']);
+    $interpretRaw = trim($row['interpret']);
 
-        // Create expected filename via the single Top40Entry->getSafeFilename()
-        $entry = new Top40Entry(0, $titelRaw, $interpretRaw, null, 0, 0);
-        $filename = $entry->getSafeFilename();
-        $filepath = $folder . $filename;
+    // Doppelte Kombinationen überspringen
+    $key = strtolower($titelRaw . '|' . $interpretRaw);
+    if (isset($alreadyProcessed[$key])) continue;
+    $alreadyProcessed[$key] = true;
 
-        // If exact file exists -> update
-        $actualBasename = null;
-        if (file_exists($filepath)) {
-            $actualBasename = $filename;
-        } else {
-            // Fallback: scan files and normalize each filename using Top40Entry->getSafeFilename()
-            foreach ($allFiles as $filePath) {
-                $basename = basename($filePath);
-                $nameNoExt = pathinfo($basename, PATHINFO_FILENAME);
-                $nameNoExt = str_replace(["–", "—", "−"], " - ", $nameNoExt);
+    $entry = new Top40Entry(0, $titelRaw, $interpretRaw, null, 0, 0);
+    $baseName = pathinfo($entry->getSafeFilename('avif'), PATHINFO_FILENAME);
 
-                if (strpos($nameNoExt, ' - ') !== false) {
-                    list($fTitle, $fArtist) = explode(' - ', $nameNoExt, 2);
-                } else {
-                    $fTitle = $nameNoExt;
-                    $fArtist = '';
-                }
+    $avifFile = $folder . $baseName . '.avif';
+    $actualFilename = null;
 
-                $fileEntry = new Top40Entry(0, $fTitle, $fArtist, null, 0, 0);
-                $normalizedFileName = $fileEntry->getSafeFilename();
+    if (file_exists($avifFile)) {
+        $actualFilename = $baseName . '.avif';
+    }
 
-                if (strcasecmp($normalizedFileName, $filename) === 0) {
-                    $actualBasename = $basename;
-                    $filepath = $filePath;
-                    break;
-                }
-            }
-        }
-
-        // Update DB if we found a matching image
-        if ($actualBasename !== null && file_exists($filepath)) {
-            $stmt = $db->prepare("UPDATE top40 SET cover = ? WHERE titel = ? AND interpret = ?");
-            if (!$stmt) {
-                echo "<p style='color:red;'>❌ Error preparing statement: " . htmlspecialchars($db->error) . "</p>";
-                continue;
-            }
-
-            $stmt->bind_param("sss", $actualBasename, $titelRaw, $interpretRaw);
+    if ($actualFilename !== null) {
+        // AVIF gefunden → Cover setzen
+        $stmt = $db->prepare("UPDATE top40 SET cover = ? WHERE titel = ? AND interpret = ?");
+        if ($stmt) {
+            $stmt->bind_param("sss", $actualFilename, $titelRaw, $interpretRaw);
             $stmt->execute();
-
-            if ($stmt->affected_rows > 0) {
-                $counter += $stmt->affected_rows;
-                echo "<p style='color:green;'>✔ Cover updated for <strong>" . htmlspecialchars($titelRaw) . "</strong> - <em>" . htmlspecialchars($interpretRaw) . "</em> (" . $stmt->affected_rows . " entries) — file: <code>" . htmlspecialchars($actualBasename) . "</code></p>";
-            } else {
-                echo "<p style='color:orange;'>⚠ No entry updated for: <strong>" . htmlspecialchars($titelRaw) . "</strong> - <em>" . htmlspecialchars($interpretRaw) . "</em></p>";
-            }
-
+            if ($stmt->affected_rows > 0) $counterUpdated += $stmt->affected_rows;
             $stmt->close();
-        } else {
-            $notFound[] = $titelRaw . ' - ' . $interpretRaw;
-            echo "<p style='color:blue;'>🔍 Not found: <code>" . htmlspecialchars($titelRaw) . " - " . htmlspecialchars($interpretRaw) . "</code> (expected: <code>" . htmlspecialchars($filename) . "</code>)</p>";
+            echo "<p style='color:green;'>✔ Updated: <strong>{$titelRaw}</strong> - <em>{$interpretRaw}</em> → <code>{$actualFilename}</code></p>";
+        }
+    } else {
+        // Kein AVIF gefunden → Cover leeren
+        $stmt = $db->prepare("UPDATE top40 SET cover = NULL WHERE titel = ? AND interpret = ?");
+        if ($stmt) {
+            $stmt->bind_param("ss", $titelRaw, $interpretRaw);
+            $stmt->execute();
+            if ($stmt->affected_rows > 0) $counterCleared += $stmt->affected_rows;
+            $stmt->close();
+            echo "<p style='color:red;'>✘ Cleared: <strong>{$titelRaw}</strong> - <em>{$interpretRaw}</em></p>";
         }
     }
+}
 
-    echo "<hr><p><strong>$counter</strong> covers successfully updated.</p>";
+echo "<hr><p><strong>$counterUpdated</strong> covers updated (AVIF gesetzt).</p>";
+echo "<p><strong>$counterCleared</strong> entries cleared (kein AVIF gefunden).</p>";
 
-    if (!empty($notFound)) {
-        echo "<h3>🚫 No image found for:</h3><ul>";
-        foreach ($notFound as $entry) {
-            echo "<li>" . htmlspecialchars($entry) . "</li>";
-        }
-        echo "</ul>";
-    }
-
-    echo "</body></html>";
-?>
+echo "</body></html>";

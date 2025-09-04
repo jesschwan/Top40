@@ -20,50 +20,54 @@ class Top40Entry {
 
     /**
      * Generate a safe filename for the cover image.
-     * Keeps apostrophes and normalizes typographic variants.
+     * The extension can be specified (default 'jpg').
      */
-    public function getSafeFilename(): string {
+    public function getSafeFilename(string $ext = 'avif'): string {
         $str = $this->titel . ' - ' . $this->interpret;
 
-        // Normalize Unicode (NFC)
         if (class_exists('Normalizer')) {
             $str = Normalizer::normalize($str, Normalizer::FORM_C);
         }
 
-        // Convert typographic apostrophes to simple '
         $str = str_replace(["’", "‘", "`"], "'", $str);
-
-        // Remove control/format characters
         $str = preg_replace('/[\p{Cc}\p{Cf}]+/u', '', $str);
-
-        // Allow letters, numbers, spaces, and some punctuation including apostrophes
         $clean = preg_replace("/[^\p{L}\p{N} ()'\\-\\.,&!]/u", '', $str);
-
-        // Collapse multiple spaces
         $clean = preg_replace('/\s+/u', ' ', $clean);
 
-        // Return trimmed filename with lowercase .jpg
-        return trim($clean) . '.jpg';
+        return trim($clean) . '.' . $ext;
     }
+    
+    // Render a table row for this entry.
 
-    /**
-     * Render a table row for this entry.
-     */
     public function renderRow(): string {
-        $filename = $this->cover ?? $this->getSafeFilename();
-        $filepath = __DIR__ . '/images/' . $filename;
-        $coverPath = 'images/' . rawurlencode($filename) . '?v=' . time();
-        $imageFound = file_exists($filepath);
+        $baseName = pathinfo($this->cover ?? $this->getSafeFilename('jpg'), PATHINFO_FILENAME);
+        $folder = __DIR__ . '/images/';
+
+        $avifFile = $folder . $baseName . '.avif';
+        $jpgFile  = $folder . $baseName . '.jpg';
+
+        // Build picture HTML
+        if (file_exists($avifFile) || file_exists($jpgFile)) {
+            $coverHtml = '<picture>';
+            if (file_exists($avifFile)) {
+                $coverHtml .= '<source srcset="images/' . rawurlencode($baseName) . '.avif" type="image/avif">';
+            }
+            if (file_exists($jpgFile)) {
+                $coverHtml .= '<img src="images/' . rawurlencode($baseName) . '.jpg" alt="Cover" width="100">';
+            } else {
+                // Fallback: use whatever $this->cover points to
+                $coverHtml .= '<img src="images/' . rawurlencode($this->cover) . '" alt="Cover" width="100">';
+            }
+            $coverHtml .= '</picture>';
+        } else {
+            $coverHtml = '<span style="color:red;">Kein Bild gefunden!</span>';
+        }
 
         $diffClass = '';
         if (is_numeric($this->diff)) {
             if ($this->diff > 0) $diffClass = ' class="diff-up"';
             elseif ($this->diff < 0) $diffClass = ' class="diff-down"';
         }
-
-        $coverHtml = $imageFound 
-            ? "<img src=\"$coverPath\" alt=\"Cover\" width=\"100\">" 
-            : "<span style='color:red;'>Kein Bild gefunden!</span>";
 
         $prev = $this->previousRank ?? '';
         $diff = $this->diff ?? '';
