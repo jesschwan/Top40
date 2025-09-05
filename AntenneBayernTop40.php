@@ -10,7 +10,6 @@
                 FROM top40 
                 WHERE kw = ? AND jahr = ? 
                 ORDER BY platz LIMIT 40";
-
         $stmt = $openDbConnection->prepare($query);
         if (!$stmt) {
             die("Error preparing the query: " . $openDbConnection->error);
@@ -24,7 +23,7 @@
 
         while ($row = $result->fetch_assoc()) {
             if ($currentRank != $row["platz"]) {
-                // HIER speichern wir das Objekt in $entry
+                // Here we save the object in $entry
                 $entry = new Top40Entry(
                     (int)$row["platz"],
                     $row["titel"],
@@ -39,10 +38,10 @@
                     $entry->titel,
                     $entry->interpret,
                     $year,
-                    $kw,                // HIER fehlte vorher $kw
+                    $kw,               
                     $entry->platz,
                     $openDbConnection,
-                    $kwList             // Übergabe war auch falsch
+                    $kwList            
                 );
 
                 $entry->previousRank = $prev['prev'];
@@ -260,7 +259,7 @@
             }
 
             th {
-                background-color: rgb(0, 0, 205);
+                background-color: rgb(30, 144, 255);
                 color: black;
                 position: sticky;
                 top: 55px;
@@ -270,7 +269,7 @@
 
             tr td:first-child {
                 font-weight: bold;
-                background-color: rgb(0, 0, 205);
+                background-color: rgb(30, 144, 255);
                 color: black;
                 text-align: center;
             }
