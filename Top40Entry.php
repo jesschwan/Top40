@@ -18,10 +18,8 @@ class Top40Entry {
         $this->jahr = $jahr;
     }
 
-    /**
-     * Generate a safe filename for the cover image.
-     * The extension can be specified (default 'jpg').
-     */
+    // Generate a safe filename for the cover image.
+    // The extension can be specified (default 'jpg').
     public function getSafeFilename(string $ext = 'avif'): string {
         $str = $this->titel . ' - ' . $this->interpret;
 

@@ -7,7 +7,7 @@
         $KWDataArray = [];
 
         $query = "SELECT platz, titel, interpret, cover 
-                FROM top40 
+                FROM top40
                 WHERE kw = ? AND jahr = ? 
                 ORDER BY platz LIMIT 40";
         $stmt = $openDbConnection->prepare($query);
