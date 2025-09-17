@@ -1,6 +1,7 @@
 <?php
     require_once "Top40Entry.php";
     require_once "SqlConnection.php";
+    require_once "ImageFromAPI.php";
     require "functions.php";
 
     function getData4KW($openDbConnection, $year, $kw, $kwList) {

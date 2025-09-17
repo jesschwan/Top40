@@ -1,6 +1,7 @@
 <?php
 require_once "SqlConnection.php";
 require_once "Top40Entry.php";
+require_once "ImageFromAPI.php";
 
 $db = getSqlConnection();
 
@@ -12,7 +13,7 @@ $counterCleared = 0;
 $alreadyProcessed = [];
 
 echo "<!DOCTYPE html><html lang='de'><head><meta charset='UTF-8'><title>Cover Update</title></head><body>";
-echo "<h2>🎵 Cover Update for Top40</h2>";
+echo "<h2>Cover Update for Top40</h2>";
 
 $folder = __DIR__ . '/images/';
 
@@ -20,7 +21,7 @@ while ($row = $result->fetch_assoc()) {
     $titelRaw = trim($row['titel']);
     $interpretRaw = trim($row['interpret']);
 
-    // Doppelte Kombinationen überspringen
+    // Skip duplicate combinations
     $key = strtolower($titelRaw . '|' . $interpretRaw);
     if (isset($alreadyProcessed[$key])) continue;
     $alreadyProcessed[$key] = true;
@@ -34,7 +35,7 @@ while ($row = $result->fetch_assoc()) {
     if (file_exists($avifFile)) {
         $actualFilename = $baseName . '.avif';
     }
-
+    // following section writes Image-Path to DB
     if ($actualFilename !== null) {
         // AVIF gefunden → Cover setzen
         $stmt = $db->prepare("UPDATE top40 SET cover = ? WHERE titel = ? AND interpret = ?");
