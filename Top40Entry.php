@@ -19,7 +19,6 @@
         }
 
         // Generate a safe filename for the cover image.
-        // The extension can be specified (default 'jpg').
         public function getSafeFilename(string $ext = 'avif'): string {
             $str = $this->titel . ' - ' . $this->interpret;
 
@@ -36,7 +35,6 @@
         }
         
         // Render a table row for this entry.
-
         public function renderRow(): string {
             $baseName = pathinfo($this->cover ?? $this->getSafeFilename('jpg'), PATHINFO_FILENAME);
             $folder = __DIR__ . '/images/';
@@ -83,9 +81,8 @@
 ?>
 
 <!-- HTML Code starts here ------------->
-
 <!DOCTYPE html>
-<html lang= "de">
+<html lang="de">
     <head>
         <meta charset="UTF-8">
         <style>
@@ -103,7 +100,7 @@
             // Function triggered when a cover button is clicked
             function coverHolen(event) {
                 const button = event.target; 
-                button.textContent = 'Loading...'; // Change button text to give user feedback
+                button.textContent = 'Loading...'; // Feedback
 
                 // Find the table row (<tr>) that contains this button
                 const row = button.closest('tr');
@@ -111,10 +108,17 @@
                 // Select the 4th cell (<td>) in this row (the cover column)
                 const cell = row.querySelector('td:nth-child(4)');
 
-                // Create a new image element as a placeholder
+                // Create a new image element as a placeholder (SVG eingebettet!)
                 const img = document.createElement('img');
-                img.src = 'images/platzhalter.avif';
-                img.alt = 'Cover';
+                img.src = 'data:image/svg+xml;utf8,' + encodeURIComponent(`
+                    <svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">
+                        <rect width="100" height="100" fill="#d4d4d4" stroke="black" stroke-width="2"/>
+                        <text x="50%" y="50%" text-anchor="middle" dominant-baseline="middle" font-size="12" fill="black">
+                            No Cover
+                        </text>
+                    </svg>
+                `);
+                img.alt = 'Kein Cover vorhanden';
                 img.width = 100;
 
                 // Replace the button with the image

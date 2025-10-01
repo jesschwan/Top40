@@ -292,7 +292,7 @@
                 margin-bottom: 30px;
             }
 
-            .dropdown, button, label {
+            .dropdown, .button-submit, label {
                 font-size: 30px;
                 font-family: Arial;
                 color: black;
@@ -300,11 +300,11 @@
                 padding: 0 20px;
             }
 
-            .dropdown, button {
+            .dropdown, .button-submit {
                 cursor: pointer;
             }
 
-            button, label {
+            .button-submit, label {
                font-weight: bold;
             }
 
@@ -316,7 +316,7 @@
                 border: 1px solid black;
             }
 
-            button {
+            .button-submit {
                 background-color: #b4b4b4;
                 border: 2px solid black;
             }
@@ -354,7 +354,7 @@
                         echo "<option value='{$entry['year']}-{$entry['kw']}' $isSelected>$label</option>";
                     endforeach; ?>
                 </select>
-                <button type="submit">Submit</button>
+                <button type="submit" class="button-submit">Submit</button>
             </form>
         </div>
 

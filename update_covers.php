@@ -1,65 +1,56 @@
 <?php
 require_once "SqlConnection.php";
-require_once "Top40Entry.php";
-require_once "ImageFromAPI.php";
 
+// Verbindung zur Datenbank
 $db = getSqlConnection();
 
-$sql = "SELECT titel, interpret FROM top40";
-$result = $db->query($sql);
-
-$counterUpdated = 0;
-$counterCleared = 0;
-$alreadyProcessed = [];
-
-echo "<!DOCTYPE html><html lang='de'><head><meta charset='UTF-8'><title>Cover Update</title></head><body>";
-echo "<h2>Cover Update for Top40</h2>";
-
+// Pfad zu den lokalen AVIF-Bildern
 $folder = __DIR__ . '/images/';
 
-while ($row = $result->fetch_assoc()) {
-    $titelRaw = trim($row['titel']);
-    $interpretRaw = trim($row['interpret']);
+// Alle AVIF-Dateien im Ordner
+$files = glob($folder . '*.avif');
 
-    // Skip duplicate combinations
-    $key = strtolower($titelRaw . '|' . $interpretRaw);
-    if (isset($alreadyProcessed[$key])) continue;
-    $alreadyProcessed[$key] = true;
+$counterUpdated = 0;
 
-    $entry = new Top40Entry(0, $titelRaw, $interpretRaw, null, 0, 0);
-    $baseName = pathinfo($entry->getSafeFilename('avif'), PATHINFO_FILENAME);
+echo "<!DOCTYPE html><html lang='de'><head><meta charset='UTF-8'><title>Cover Update</title></head><body>";
+echo "<h1>🚀 Cover Upload in die Datenbank</h1>";
+echo "<hr>";
 
-    $avifFile = $folder . $baseName . '.avif';
-    $actualFilename = null;
+foreach ($files as $filePath) {
+    $basename = basename($filePath); // z. B. "Rock N Roll - Leony x G-Eazy.avif"
+    $filenameNoExt = pathinfo($basename, PATHINFO_FILENAME);
 
-    if (file_exists($avifFile)) {
-        $actualFilename = $baseName . '.avif';
+    // Titel und Interpret extrahieren
+    $parts = explode(' - ', $filenameNoExt, 2);
+    if (count($parts) !== 2) {
+        echo "<p style='color:orange;'>⚠️ Datei übersprungen, ungültiger Name: $basename</p>";
+        continue;
     }
-    // following section writes Image-Path to DB
-    if ($actualFilename !== null) {
-        // AVIF gefunden → Cover setzen
-        $stmt = $db->prepare("UPDATE top40 SET cover = ? WHERE titel = ? AND interpret = ?");
-        if ($stmt) {
-            $stmt->bind_param("sss", $actualFilename, $titelRaw, $interpretRaw);
-            $stmt->execute();
-            if ($stmt->affected_rows > 0) $counterUpdated += $stmt->affected_rows;
-            $stmt->close();
-            echo "<p style='color:green;'>✔ Updated: <strong>{$titelRaw}</strong> - <em>{$interpretRaw}</em> → <code>{$actualFilename}</code></p>";
-        }
+
+    [$title, $artist] = $parts;
+
+    // Dateiinhalt als Binary-Stream lesen
+    $coverData = file_get_contents($filePath);
+
+    // UPDATE in die Datenbank
+    $stmt = $db->prepare("UPDATE top40 SET cover = ? WHERE titel = ? AND interpret = ?");
+    if (!$stmt) {
+        die("Fehler beim Vorbereiten des Statements: " . $db->error);
+    }
+
+    $stmt->bind_param("sss", $coverData, $title, $artist);
+    $stmt->execute();
+
+    if ($stmt->affected_rows > 0) {
+        $counterUpdated++;
+        echo "<p style='color:green;'>✅ Cover gesetzt für: <strong>$title</strong> - <em>$artist</em></p>";
     } else {
-        // Kein AVIF gefunden → Cover leeren
-        $stmt = $db->prepare("UPDATE top40 SET cover = NULL WHERE titel = ? AND interpret = ?");
-        if ($stmt) {
-            $stmt->bind_param("ss", $titelRaw, $interpretRaw);
-            $stmt->execute();
-            if ($stmt->affected_rows > 0) $counterCleared += $stmt->affected_rows;
-            $stmt->close();
-            echo "<p style='color:red;'>✘ Cleared: <strong>{$titelRaw}</strong> - <em>{$interpretRaw}</em></p>";
-        }
+        echo "<p style='color:red;'>⚠️ Kein Datensatz gefunden für: <strong>$title</strong> - <em>$artist</em></p>";
     }
+
+    $stmt->close();
 }
 
-echo "<hr><p><strong>$counterUpdated</strong> covers updated (AVIF gesetzt).</p>";
-echo "<p><strong>$counterCleared</strong> entries cleared (kein AVIF gefunden).</p>";
-
+echo "<hr><p><strong>$counterUpdated</strong> Cover wurden erfolgreich hochgeladen.</p>";
 echo "</body></html>";
+?>
