@@ -13,7 +13,7 @@
             $this->platz = $platz;
             $this->titel = $titel;
             $this->interpret = $interpret;
-            $this->cover = $cover;
+            $this->cover = $cover; // Verbessern
             $this->kw = $kw;
             $this->jahr = $jahr;
         }
@@ -36,26 +36,14 @@
         
         // Render a table row for this entry.
         public function renderRow(): string {
-            $baseName = pathinfo($this->cover ?? $this->getSafeFilename('jpg'), PATHINFO_FILENAME);
-            $folder = __DIR__ . '/images/';
+            // Prüfen, ob es ein Cover gibt (mindestens 50 Bytes für echte AVIF-Datei)
+            $hasCover = ($this->cover !== null && strlen($this->cover) > 500);
 
-            $avifFile = $folder . $baseName . '.avif';
-            $jpgFile  = $folder . $baseName . '.jpg';
-
-            // Build picture HTML
-            if (file_exists($avifFile) || file_exists($jpgFile)) {
-                $coverHtml = '<picture>';
-                if (file_exists($avifFile)) {
-                    $coverHtml .= '<source srcset="images/' . rawurlencode($baseName) . '.avif" type="image/avif">';
-                }
-                if (file_exists($jpgFile)) {
-                    $coverHtml .= '<img src="images/' . rawurlencode($baseName) . '.jpg" alt="Cover" width="100">';
-                } else {
-                    // Fallback: use whatever $this->cover points to
-                    $coverHtml .= '<img src="images/' . rawurlencode($this->cover) . '" alt="Cover" width="100">';
-                }
-                $coverHtml .= '</picture>';
+            if ($hasCover) {
+                $base64 = base64_encode($this->cover);
+                $coverHtml = '<img src="data:image/avif;base64,' . $base64 . '" alt="Cover" width="100">';
             } else {
+                // Kein Cover → Button anzeigen
                 $coverHtml = '<span><button type="button" class="button-cover">Cover holen</button></span>';
             }
 
