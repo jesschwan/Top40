@@ -13,12 +13,12 @@
             $this->platz = $platz;
             $this->titel = $titel;
             $this->interpret = $interpret;
-            $this->cover = $cover; // Verbessern
+            $this->cover = $cover; // Store cover data
             $this->kw = $kw;
             $this->jahr = $jahr;
         }
 
-        // Generate a safe filename for the cover image.
+        // Generate a safe filename for the cover image
         public function getSafeFilename(string $ext = 'avif'): string {
             $str = $this->titel . ' - ' . $this->interpret;
 
@@ -34,17 +34,17 @@
             return trim($clean) . '.' . $ext;
         }
         
-        // Render a table row for this entry.
+        // Render a table row for this entry
         public function renderRow(): string {
-            // Prüfen, ob es ein Cover gibt (mindestens 50 Bytes für echte AVIF-Datei)
+            // Check if a cover exists (at least 500 bytes for a real AVIF file)
             $hasCover = ($this->cover !== null && strlen($this->cover) > 500);
 
             if ($hasCover) {
                 $base64 = base64_encode($this->cover);
                 $coverHtml = '<img src="data:image/avif;base64,' . $base64 . '" alt="Cover" width="100">';
             } else {
-                // Kein Cover → Button anzeigen
-                $coverHtml = '<span><button type="button" class="button-cover">Cover holen</button></span>';
+                // No cover → show a button
+                $coverHtml = '<span><button type="button" class="button-cover">Get Cover</button></span>';
             }
 
             $diffClass = '';
@@ -68,7 +68,7 @@
     }
 ?>
 
-<!-- HTML Code starts here ------------->
+<!-- HTML Code starts here -------------> 
 <!DOCTYPE html>
 <html lang="de">
     <head>
@@ -87,6 +87,7 @@
         <script>
             // Function triggered when a cover button is clicked
             function coverHolen(event) {
+                require_once "ImageFromAPI.php";
                 const button = event.target; 
                 button.textContent = 'Loading...'; // Feedback
 
@@ -95,8 +96,15 @@
 
                 // Select the 4th cell (<td>) in this row (the cover column)
                 const cell = row.querySelector('td:nth-child(4)');
-
-                // Create a new image element as a placeholder (SVG eingebettet!)
+                $interpret = "Alvaro Soler";
+                $titel = "Con Calma";
+               
+                // ImageFromAPI gets Cover as string stream
+                $myFirstPicture = new ImageFromAPI( $interpret, $titel);
+                // writes String to Database
+                $myFirstPicture.writeImageToDB();
+                
+                // Create a new image element as a placeholder (embedded SVG!)
                 const img = document.createElement('img');
                 img.src = 'data:image/svg+xml;utf8,' + encodeURIComponent(`
                     <svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">
@@ -106,7 +114,7 @@
                         </text>
                     </svg>
                 `);
-                img.alt = 'Kein Cover vorhanden';
+                img.alt = 'No cover available';
                 img.width = 100;
 
                 // Replace the button with the image
