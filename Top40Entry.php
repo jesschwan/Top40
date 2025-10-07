@@ -44,7 +44,7 @@
                 $coverHtml = '<img src="data:image/avif;base64,' . $base64 . '" alt="Cover" width="100">';
             } else {
                 // No cover → show a button
-                $coverHtml = '<span><button type="button" class="button-cover">Get Cover</button></span>';
+                $coverHtml = '<span><button type="submit" class="button-cover">Get Cover</button></span>';
             }
 
             $diffClass = '';
@@ -87,14 +87,14 @@
         <script>
             // Function triggered when a cover button is clicked
             function coverHolen(event) {
-                require_once "ImageFromAPI.php";
+
                 const button = event.target; 
                 button.textContent = 'Loading...'; // Feedback
 
                 // Find the table row (<tr>) that contains this button
                 const row = button.closest('tr');
 
-                // Select the 4th cell (<td>) in this row (the cover column)
+                /* Select the 4th cell (<td>) in this row (the cover column)
                 const cell = row.querySelector('td:nth-child(4)');
                 $interpret = "Alvaro Soler";
                 $titel = "Con Calma";
@@ -102,7 +102,7 @@
                 // ImageFromAPI gets Cover as string stream
                 $myFirstPicture = new ImageFromAPI( $interpret, $titel);
                 // writes String to Database
-                $myFirstPicture.writeImageToDB();
+                $myFirstPicture.writeImageToDB();*/
                 
                 // Create a new image element as a placeholder (embedded SVG!)
                 const img = document.createElement('img');

@@ -4,6 +4,7 @@
     require_once "ImageFromAPI.php";
     require "functions.php";
 
+    // Fetch Top 40 data for a specific week (year + KW)
     function getData4KW($openDbConnection, $year, $kw, $kwList) {
         $KWDataArray = [];
 
@@ -24,7 +25,7 @@
 
         while ($row = $result->fetch_assoc()) {
             if ($currentRank != $row["platz"]) {
-                // Here we save the object in $entry
+                // Create a Top40Entry object
                 $entry = new Top40Entry(
                     (int)$row["platz"],
                     $row["titel"],
@@ -34,7 +35,7 @@
                     $year
                 );
 
-                // Vorwochen-Daten berechnen
+                // Calculate previous week's data
                 $prev = getPreviousChartPosition(
                     $entry->titel,
                     $entry->interpret,
@@ -48,7 +49,7 @@
                 $entry->previousRank = $prev['prev'];
                 $entry->diff = $prev['diff'];
 
-                // in Array speichern
+                // Store in array
                 $KWDataArray[] = $entry;
             }
             $currentRank = $row["platz"];
@@ -57,7 +58,7 @@
         return $KWDataArray;
     }
 
-    // Find the closest earlier week in DB
+    // Find the closest earlier week in the database
     function getNextEarlierWeek($openDbConnection, $year, $kw) {
         $current = $year * 100 + $kw;
 
@@ -84,7 +85,7 @@
         return null;
     }
 
-    // TRUE if no earlier week exists
+    // Return TRUE if no previous week exists
     function hasNoPreviousWeek($openDbConnection, $year, $kw) {
         $prev = getNextEarlierWeek($openDbConnection, $year, $kw);
         return !$prev;
@@ -123,7 +124,7 @@
             $stmt->close();
         }
 
-        // Check if first appearance
+        // Check if this is the first appearance of the song
         $stmt2 = $openDbConnection->prepare("
             SELECT jahr, kw 
             FROM top40 
@@ -149,6 +150,7 @@
             return ['prev' => 'NEW', 'diff' => 'NEW'];
         }
 
+        // Return "RE" if previous week info not available
         return ['prev' => 'RE', 'diff' => 'RE'];
     }
 
@@ -164,7 +166,7 @@
         return $prevWeekLabel;
     }
 
-    // Open DB connection
+    // Open database connection
     $openDbConnection = getSqlConnection();
 
     // Get all available weeks
@@ -178,7 +180,7 @@
         return (int)$a['year'] <=> (int)$b['year'];
     });
 
-    // Selected year/week or fallback to latest
+    // Selected year/week from dropdown or fallback to latest
     $selectedKw = $_POST['kwYearDropDown'] ?? null;
 
     if ($selectedKw) {
@@ -194,7 +196,7 @@
     // Fetch data for selected week
     $data = getData4KW($openDbConnection, $year, $kw, $kwList);
 
-    // Previous week label
+    // Get previous week label
     $prevWeekLabel = getPrevWeekLabel4Header($openDbConnection, $year, $kw);
 
     // Label for current week
@@ -203,17 +205,28 @@
     // Show warning if no previous week exists
     $showWarning = hasNoPreviousWeek($openDbConnection, $year, $kw);
 
+
+    // ToDo: add php code for Button GetCover 
+    if ($_POST)
+        $interpret = "Alvaro Soler";
+        $titel = "Con Calma";
+               
+        // ImageFromAPI gets Cover as string stream
+        $myFirstPicture = new ImageFromAPI( $interpret, $titel);
+        // writes String to Database
+        $myFirstPicture.writeImageToDB();
+                
 ?>
 
-<!-- HTML Code starts here ------------->
+<!-- HTML starts here ------------->
 
 <!DOCTYPE html>
-<html lang= "de">
+<html lang="de">
     <head>
         <meta charset="UTF-8">
         <title>Top 40</title>
         <style>
-
+            /* General page styling */
             body {
                 font-family: Arial, sans-serif;
                 text-align: center;
@@ -221,6 +234,7 @@
                 background-color: white;
             }
 
+            /* Header styling */
             h1 {
                 font-size: 45px;
                 position: sticky;
@@ -232,6 +246,7 @@
                 z-index: 10;
             }
 
+            /* Warning message styling */
             .warning {
                 color: red;
                 font-size: 50px;
@@ -240,6 +255,7 @@
                 text-align: center;
             }
 
+            /* Table styling */
             table {
                 margin: auto;
                 border-collapse: collapse;
@@ -275,6 +291,7 @@
                 text-align: center;
             }
 
+            /* Column alignment */
             td:nth-child(2), th:nth-child(2),
             td:nth-child(3), th:nth-child(3) {
                 text-align: left;
@@ -285,6 +302,7 @@
                 text-align: center;
             }
 
+            /* Form styling */
             .form-container {
                 display: flex;
                 justify-content: center;
@@ -330,6 +348,7 @@
                 height: 50px;
             }
 
+            /* Diff column colors */
            .diff-up {
             color: green;
             font-weight: bold;
@@ -344,6 +363,7 @@
 
     <body>
 
+        <!-- Week selection form -->
         <div class="form-container">
             <form method="post" class="form-container">
                 <label for="kwYearDropDown">Wähle:</label>
@@ -358,10 +378,10 @@
             </form>
         </div>
 
+        <!-- Display header or warning -->
         <?php if (!$showWarning): ?>
             <h1>Top 40 – <?= htmlspecialchars($selectedLabel) ?></h1>
         <?php endif; ?>
-
 
         <?php if ($showWarning): ?>
             <div class="warning">Keine Daten der Vorwoche vorhanden!</div>
@@ -372,10 +392,16 @@
                     <th><?= htmlspecialchars($prevWeekLabel) ?></th><th>Diff.</th>
                 </tr>
                 
-                <?php foreach ($data as $entry): ?>
-                    <?= $entry->renderRow() ?>
-                <?php endforeach; ?>
-
+                <!-- Render each row of data -->
+                <!-- // ToDo: Buttons for getting Cover, so use Form, POST.... -->
+                <form action="xxx.php" method="POST">
+                    <input type="submit">
+                        
+                    <?php foreach ($data as $entry): 
+                        $entry->renderRow() 
+                    endforeach; 
+                    ?>
+                </form>
             </table>
         <?php endif; ?>
 
