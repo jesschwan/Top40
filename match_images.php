@@ -3,15 +3,18 @@ require_once "SqlConnection.php";
 require_once "Top40Entry.php";
 require_once "ImageFromAPI.php";
 
+// Open database connection
 $openDbConnection = getSqlConnection();
 
+// Fetch all distinct songs from the Top 40
 $sql = "SELECT DISTINCT titel, interpret FROM top40";
 $result = $openDbConnection->query($sql);
 if (!$result) die("DB Error: " . $openDbConnection->error);
 
+// Folder containing images (can be omitted if not used)
 $folder = __DIR__ . '/images/';
 
-// Scan both AVIF and JPG files
+// Scan all AVIF and JPG files in the folder
 $allFiles = [];
 foreach (glob($folder . '*') as $file) {
     if (preg_match('/\.(avif|jpg)$/i', $file)) {
@@ -21,8 +24,10 @@ foreach (glob($folder . '*') as $file) {
 
 $notMatched = [];
 
-echo "<h1>Bildvergleich – mögliche Übereinstimmungen</h1>";
+// Display header
+echo "<h1>Image Comparison – Possible Matches</h1>";
 
+// Loop through all songs
 while ($row = $result->fetch_assoc()) {
     $title = $row['titel'];
     $artist = $row['interpret'];
@@ -42,19 +47,22 @@ while ($row = $result->fetch_assoc()) {
         $expectedFilename = $expectedFilenameJpg;
     }
 
+    // If a matching file exists, display it and continue
     if ($expectedFilename !== null) {
-        echo "✅ Bild gefunden: <code>" . htmlspecialchars($expectedFilename) . "</code><br>";
+        echo "✅ Image found: <code>" . htmlspecialchars($expectedFilename) . "</code><br>";
         continue;
     }
 
-    // Fallback: scan all files and normalize
+    // Fallback: scan all files and normalize names
     $matched = false;
     foreach ($allFiles as $filePath) {
         $basename = basename($filePath);
         $nameNoExt = pathinfo($basename, PATHINFO_FILENAME);
 
+        // Normalize dash characters
         $nameNoExt = str_replace(["–", "—", "−"], " - ", $nameNoExt);
 
+        // Split into title and artist if possible
         if (strpos($nameNoExt, ' - ') !== false) {
             list($fTitle, $fArtist) = explode(' - ', $nameNoExt, 2);
         } else {
@@ -64,25 +72,28 @@ while ($row = $result->fetch_assoc()) {
 
         $fileEntry = new Top40Entry(0, $fTitle, $fArtist, null, 0, 0);
 
-        // Compare both AVIF and JPG filenames
+        // Compare AVIF and JPG filenames
         if (strcasecmp($fileEntry->getSafeFilename('avif'), $entry->getSafeFilename('avif')) === 0 ||
             strcasecmp($fileEntry->getSafeFilename('jpg'), $entry->getSafeFilename('jpg')) === 0) {
-            echo "✅ Bild gefunden (Fallback): <code>" . htmlspecialchars($basename) . "</code><br>";
+            echo "✅ Image found (Fallback): <code>" . htmlspecialchars($basename) . "</code><br>";
             $matched = true;
             break;
         }
     }
 
+    // If no match found, add to the list
     if (!$matched) {
-        echo "⚠️ Keine Übereinstimmung gefunden für: <strong>" . htmlspecialchars($title) . " - " . htmlspecialchars($artist) . "</strong><br>";
+        echo "⚠️ No match found for: <strong>" . htmlspecialchars($title) . " - " . htmlspecialchars($artist) . "</strong><br>";
         $notMatched[] = "$title - $artist";
     }
 }
 
-echo "<br><strong>Erledigt!</strong> Keine Dateien wurden verändert.<br>";
+// Finished message
+echo "<br><strong>Done!</strong> No files were changed.<br>";
 
+// Display all unmatched entries
 if (!empty($notMatched)) {
-    echo "<h3>Keine Übereinstimmung gefunden für:</h3><ul>";
+    echo "<h3>No match found for:</h3><ul>";
     foreach ($notMatched as $nm) {
         echo "<li>" . htmlspecialchars($nm) . "</li>";
     }

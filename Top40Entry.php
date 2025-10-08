@@ -47,6 +47,7 @@
                 $coverHtml = '<span><button type="submit" class="button-cover">Get Cover</button></span>';
             }
 
+            // calcukation for week difference column outfit --> setting css class
             $diffClass = '';
             if (is_numeric($this->diff)) {
                 if ($this->diff > 0) $diffClass = ' class="diff-up"';

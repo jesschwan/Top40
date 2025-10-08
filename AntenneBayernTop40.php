@@ -4,6 +4,34 @@
     require_once "ImageFromAPI.php";
     require "functions.php";
 
+    if (isset($_POST['getCover']) && !empty($_POST['titel']) && !empty($_POST['interpret'])) {
+        $titel = $_POST['titel'];
+        $interpret = $_POST['interpret'];
+
+        // Verbindung zur DB herstellen
+        $openDbConnection = getSqlConnection();
+
+        // Cover über API holen
+        $imageApi = new ImageFromAPI();
+        $imageData = $imageApi->getFrontCover($interpret, $titel);
+
+        if (!empty($imageData)) {
+            // In DB speichern
+            $stmt = $openDbConnection->prepare("
+                UPDATE top40 
+                SET cover = ? 
+                WHERE titel = ? AND interpret = ?
+            ");
+            $stmt->bind_param("sss", $imageData, $titel, $interpret);
+            $stmt->execute();
+            $stmt->close();
+        }
+
+        // Seite neu laden, damit das neue Cover sichtbar ist
+        header("Location: " . $_SERVER['PHP_SELF']);
+        exit;
+    }
+
     // Fetch Top 40 data for a specific week (year + KW)
     function getData4KW($openDbConnection, $year, $kw, $kwList) {
         $KWDataArray = [];
@@ -204,17 +232,6 @@
 
     // Show warning if no previous week exists
     $showWarning = hasNoPreviousWeek($openDbConnection, $year, $kw);
-
-
-    // ToDo: add php code for Button GetCover 
-    if ($_POST)
-        $interpret = "Alvaro Soler";
-        $titel = "Con Calma";
-               
-        // ImageFromAPI gets Cover as string stream
-        $myFirstPicture = new ImageFromAPI( $interpret, $titel);
-        // writes String to Database
-        $myFirstPicture.writeImageToDB();
                 
 ?>
 
@@ -391,17 +408,18 @@
                     <th>Platz</th><th>Titel</th><th>Interpret</th><th>Cover</th>
                     <th><?= htmlspecialchars($prevWeekLabel) ?></th><th>Diff.</th>
                 </tr>
-                
+
                 <!-- Render each row of data -->
                 <!-- // ToDo: Buttons for getting Cover, so use Form, POST.... -->
                 <form action="xxx.php" method="POST">
                     <input type="submit">
                         
                     <?php foreach ($data as $entry): 
-                        $entry->renderRow() 
+                        $entry->renderRow(); 
                     endforeach; 
                     ?>
                 </form>
+
             </table>
         <?php endif; ?>
 

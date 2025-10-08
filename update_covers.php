@@ -1,56 +1,60 @@
 <?php
 require_once "SqlConnection.php";
 
-// Verbindung zur Datenbank
+// Open database connection
 $db = getSqlConnection();
 
-// Pfad zu den lokalen AVIF-Bildern
+// Path to local AVIF images
 $folder = __DIR__ . '/images/';
 
-// Alle AVIF-Dateien im Ordner
+// Get all AVIF files in the folder
 $files = glob($folder . '*.avif');
 
 $counterUpdated = 0;
 
 echo "<!DOCTYPE html><html lang='de'><head><meta charset='UTF-8'><title>Cover Update</title></head><body>";
-echo "<h1>🚀 Cover Upload in die Datenbank</h1>";
+echo "<h1>🚀 Upload Covers to Database</h1>";
 echo "<hr>";
 
+// Loop through each AVIF file
 foreach ($files as $filePath) {
-    $basename = basename($filePath); // z. B. "Rock N Roll - Leony x G-Eazy.avif"
+    $basename = basename($filePath); // e.g. "Rock N Roll - Leony x G-Eazy.avif"
     $filenameNoExt = pathinfo($basename, PATHINFO_FILENAME);
 
-    // Titel und Interpret extrahieren
+    // Extract title and artist from filename
     $parts = explode(' - ', $filenameNoExt, 2);
     if (count($parts) !== 2) {
-        echo "<p style='color:orange;'>⚠️ Datei übersprungen, ungültiger Name: $basename</p>";
+        echo "<p style='color:orange;'>⚠️ File skipped, invalid name: $basename</p>";
         continue;
     }
 
     [$title, $artist] = $parts;
 
-    // Dateiinhalt als Binary-Stream lesen
+    // Read file content as binary stream
     $coverData = file_get_contents($filePath);
 
-    // UPDATE in die Datenbank
+    // Prepare UPDATE statement for the database
     $stmt = $db->prepare("UPDATE top40 SET cover = ? WHERE titel = ? AND interpret = ?");
     if (!$stmt) {
-        die("Fehler beim Vorbereiten des Statements: " . $db->error);
+        die("Error preparing statement: " . $db->error);
     }
 
+    // Bind parameters: cover data, title, artist
     $stmt->bind_param("sss", $coverData, $title, $artist);
     $stmt->execute();
 
+    // Check if any rows were updated
     if ($stmt->affected_rows > 0) {
         $counterUpdated++;
-        echo "<p style='color:green;'>✅ Cover gesetzt für: <strong>$title</strong> - <em>$artist</em></p>";
+        echo "<p style='color:green;'>✅ Cover set for: <strong>$title</strong> - <em>$artist</em></p>";
     } else {
-        echo "<p style='color:red;'>⚠️ Kein Datensatz gefunden für: <strong>$title</strong> - <em>$artist</em></p>";
+        echo "<p style='color:red;'>⚠️ No record found for: <strong>$title</strong> - <em>$artist</em></p>";
     }
 
+    // Close the statement
     $stmt->close();
 }
 
-echo "<hr><p><strong>$counterUpdated</strong> Cover wurden erfolgreich hochgeladen.</p>";
+echo "<hr><p><strong>$counterUpdated</strong> covers were successfully uploaded.</p>";
 echo "</body></html>";
 ?>
