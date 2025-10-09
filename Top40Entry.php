@@ -47,15 +47,19 @@
                 $coverHtml = '<span><button type="submit" class="button-cover">Get Cover</button></span>';
             }
 
-            // calcukation for week difference column outfit --> setting css class
+            // calculation for week difference column outfit --> setting css class
             $diffClass = '';
-            if (is_numeric($this->diff)) {
+            if ($this->diff !== null && is_numeric($this->diff)) {
                 if ($this->diff > 0) $diffClass = ' class="diff-up"';
                 elseif ($this->diff < 0) $diffClass = ' class="diff-down"';
             }
 
-            $prev = $this->previousRank ?? '';
-            $diff = $this->diff ?? '';
+            $prev = '';
+            if ($this->previousRank !== null)
+                $prev = $this->previousRank;
+            $diff = '';
+            if ($this->diff != null)
+                $diff = $this->diff;
 
             return "<tr>
                 <td>{$this->platz}</td>
@@ -68,68 +72,3 @@
         }
     }
 ?>
-
-<!-- HTML Code starts here -------------> 
-<!DOCTYPE html>
-<html lang="de">
-    <head>
-        <meta charset="UTF-8">
-        <style>
-            .button-cover {
-                font-size: 25px;
-                background-color: #d4d4d4;
-                border: 2px solid black;
-                font-weight: bold;
-                cursor: pointer;
-            }
-        </style>
-    </head>
-    <body>
-        <script>
-            // Function triggered when a cover button is clicked
-            function coverHolen(event) {
-
-                const button = event.target; 
-                button.textContent = 'Loading...'; // Feedback
-
-                // Find the table row (<tr>) that contains this button
-                const row = button.closest('tr');
-
-                /* Select the 4th cell (<td>) in this row (the cover column)
-                const cell = row.querySelector('td:nth-child(4)');
-                $interpret = "Alvaro Soler";
-                $titel = "Con Calma";
-               
-                // ImageFromAPI gets Cover as string stream
-                $myFirstPicture = new ImageFromAPI( $interpret, $titel);
-                // writes String to Database
-                $myFirstPicture.writeImageToDB();*/
-                
-                // Create a new image element as a placeholder (embedded SVG!)
-                const img = document.createElement('img');
-                img.src = 'data:image/svg+xml;utf8,' + encodeURIComponent(`
-                    <svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">
-                        <rect width="100" height="100" fill="#d4d4d4" stroke="black" stroke-width="2"/>
-                        <text x="50%" y="50%" text-anchor="middle" dominant-baseline="middle" font-size="12" fill="black">
-                            No Cover
-                        </text>
-                    </svg>
-                `);
-                img.alt = 'No cover available';
-                img.width = 100;
-
-                // Replace the button with the image
-                cell.innerHTML = ''; 
-                cell.appendChild(img);
-            }
-
-            // Wait until the DOM is fully loaded, then attach click event listeners
-            document.addEventListener('DOMContentLoaded', function () {
-                const buttons = document.querySelectorAll('.button-cover');
-                buttons.forEach(button => {
-                    button.addEventListener('click', coverHolen);
-                });
-            });
-        </script>
-    </body>
-</html>

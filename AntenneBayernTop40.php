@@ -4,7 +4,7 @@
     require_once "ImageFromAPI.php";
     require "functions.php";
 
-    if (isset($_POST['getCover']) && !empty($_POST['titel']) && !empty($_POST['interpret'])) {
+    if (isset($_POST['getCover']) && !empty($_POST['titel']) && !empty($_POST['interpret'])) { // hinterfragen
         $titel = $_POST['titel'];
         $interpret = $_POST['interpret'];
 
@@ -411,11 +411,10 @@
 
                 <!-- Render each row of data -->
                 <!-- // ToDo: Buttons for getting Cover, so use Form, POST.... -->
-                <form action="xxx.php" method="POST">
-                    <input type="submit">
-                        
+                <form action="#" method="POST">
+                    
                     <?php foreach ($data as $entry): 
-                        $entry->renderRow(); 
+                        echo ($entry->renderRow());
                     endforeach; 
                     ?>
                 </form>
