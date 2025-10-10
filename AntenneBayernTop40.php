@@ -4,34 +4,6 @@
     require_once "ImageFromAPI.php";
     require "functions.php";
 
-    if (isset($_POST['getCover']) && !empty($_POST['titel']) && !empty($_POST['interpret'])) { // hinterfragen
-        $titel = $_POST['titel'];
-        $interpret = $_POST['interpret'];
-
-        // Verbindung zur DB herstellen
-        $openDbConnection = getSqlConnection();
-
-        // Cover über API holen
-        $imageApi = new ImageFromAPI();
-        $imageData = $imageApi->getFrontCover($interpret, $titel);
-
-        if (!empty($imageData)) {
-            // In DB speichern
-            $stmt = $openDbConnection->prepare("
-                UPDATE top40 
-                SET cover = ? 
-                WHERE titel = ? AND interpret = ?
-            ");
-            $stmt->bind_param("sss", $imageData, $titel, $interpret);
-            $stmt->execute();
-            $stmt->close();
-        }
-
-        // Seite neu laden, damit das neue Cover sichtbar ist
-        header("Location: " . $_SERVER['PHP_SELF']);
-        exit;
-    }
-
     // Fetch Top 40 data for a specific week (year + KW)
     function getData4KW($openDbConnection, $year, $kw, $kwList) {
         $KWDataArray = [];
@@ -208,17 +180,47 @@
         return (int)$a['year'] <=> (int)$b['year'];
     });
 
-    // Selected year/week from dropdown or fallback to latest
-    $selectedKw = $_POST['kwYearDropDown'] ?? null;
+    $selectedKw = null;
+    if ( isset($_POST['kwYearDropDown']))
+        $selectedKw = $_POST['kwYearDropDown'];
 
     if ($selectedKw) {
         [$year, $kw] = explode('-', $selectedKw);
         $year = (int)$year;
         $kw = (int)$kw;
     } else {
+        // Selected year/week from dropdown or fallback to latest        
         $latest = end($kwList);
         $year = (int)$latest['year'];
         $kw = (int)$latest['kw'];
+    }
+
+    $titel = null;
+    $interpret = null;
+
+    if (isset($_POST['getCover'])) {            // Check if the button was clicked
+        $titel = $_POST['titel'];
+        $interpret = $_POST['interpret'];
+
+        if ($titel && $interpret) {            // Check if both values are present
+            if (!isset($openDbConnection)) {   // Establish DB connection if not already set
+                $openDbConnection = getSqlConnection();
+            }
+
+            // Fetch cover from the API
+            $ImageContent = (new ImageFromAPI())->getFrontCover($interpret, $titel);
+
+            if (!empty($ImageContent)) {       // Only save if an image was returned
+                $stmt = $openDbConnection->prepare("
+                    UPDATE top40 
+                    SET cover = ? 
+                    WHERE titel = ? AND interpret = ?
+                ");
+                $stmt->bind_param("sss", $ImageContent, $titel, $interpret);
+                $stmt->execute();
+                $stmt->close();
+            }
+        }
     }
 
     // Fetch data for selected week
@@ -356,6 +358,17 @@
                 border: 2px solid black;
             }
 
+            .button-cover {
+                background-color: #b4b4b4;
+                border: 1px solid black;
+                font-family: Arial, sans-serif;
+                font-weight: bold;
+                color: black;
+                font-size: 20px;
+                padding: 8px 16px;
+                cursor: pointer;
+            }
+
             label {
                 font-weight: bold;
                 color: black;
@@ -367,8 +380,8 @@
 
             /* Diff column colors */
            .diff-up {
-            color: green;
-            font-weight: bold;
+                color: green;
+                font-weight: bold;
             }
 
             .diff-down {
@@ -379,8 +392,8 @@
     </head>
 
     <body>
-
-        <!-- Week selection form -->
+    
+    <!-- Week selection form -->
         <div class="form-container">
             <form method="post" class="form-container">
                 <label for="kwYearDropDown">Wähle:</label>
@@ -418,6 +431,13 @@
                     endforeach; 
                     ?>
                 </form>
+
+                <!-- Formular für "Get Cover" -->
+                <form method="post" action="#">
+                    <input type="hidden" name="titel" value="<?= htmlspecialchars($entry->titel) ?>">
+                    <input type="hidden" name="interpret" value="<?= htmlspecialchars($entry->interpret) ?>">
+                    <button type="submit" name="getCover" class="button-cover">Get Cover</button>
+                </form>    
 
             </table>
         <?php endif; ?>
