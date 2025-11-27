@@ -1,7 +1,7 @@
 <?php
-    require_once "Top40Entry.php";
+    require_once "classes/Top40Entry.php";
     require_once "SqlConnection.php";
-    require_once "ImageFromAPI.php";
+    require_once "classes/ImageFromAPI.php";
     require "functions.php";
 
     // Fetch Top 40 data for a specific week (year + KW)
