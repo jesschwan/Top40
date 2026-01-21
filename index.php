@@ -10,15 +10,15 @@
 
         // Query: Top 40 entries of the selected calendar week directly from top40
         $query = "
-            SELECT 
-                t.Platz AS platz,
-                t.Titel AS titel,
-                t.Interpret AS interpret,
-                t.cover AS cover
+        SELECT 
+            t.platz AS platz,
+            t.song_name AS titel
             FROM top40 t
+            JOIN songs AS s
+            ON s.song_id = t.song_id
             WHERE t.jahr = ? AND t.kw = ?
-            ORDER BY t.Platz
-            LIMIT 40
+            ORDER BY t.platz
+            LIMIT 40;
         ";
 
         $stmt = $openDbConnection->prepare($query);
