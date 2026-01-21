@@ -12,13 +12,15 @@
         $query = "
         SELECT 
             t.platz AS platz,
-            t.song_name AS titel
-            FROM top40 t
-            JOIN songs AS s
-            ON s.song_id = t.song_id
-            WHERE t.jahr = ? AND t.kw = ?
-            ORDER BY t.platz
-            LIMIT 40;
+            t.song_id AS song_id,
+            s.song_name AS titel,
+            s.artist AS interpret,
+            s.cover_image AS cover
+        FROM top40 t
+        JOIN songs s ON s.song_id = t.song_id
+        WHERE t.jahr = ? AND t.kw = ?
+        ORDER BY t.platz
+        LIMIT 40;
         ";
 
         $stmt = $openDbConnection->prepare($query);
@@ -30,6 +32,7 @@
         $result = $stmt->get_result();
 
         $currentRank = 0;
+
 
         while ($row = $result->fetch_assoc()) {
             if ($currentRank != $row["platz"]) {
@@ -43,10 +46,14 @@
                     null
                 );
 
-                // Determine previous week’s rank
+                // song_id an den Entry hängen (oder Constructor erweitern)
+                if (property_exists($entry, 'songId')) {
+                    $entry->songId = (int)$row['song_id'];
+                }
+
+                // Vorwoche über song_id ermitteln (siehe neue Funktion unten)
                 $prev = getPreviousChartPosition(
-                    $entry->titel,
-                    $entry->interpret,
+                    (int)$row['song_id'],
                     $year,
                     $kw,
                     $entry->platz,
@@ -121,8 +128,8 @@
             $stmt = $openDbConnection->prepare("
                 SELECT platz 
                 FROM top40 
-                WHERE LOWER(titel) = LOWER(?) 
-                AND LOWER(interpret) = LOWER(?) 
+                WHERE LOWER(song_name) = LOWER(?) 
+                AND LOWER(artist) = LOWER(?) 
                 AND jahr = ? 
                 AND kw = ?
             ");
@@ -142,8 +149,8 @@
         $stmt2 = $openDbConnection->prepare("
             SELECT jahr, kw 
             FROM top40 
-            WHERE LOWER(titel) = LOWER(?) 
-            AND LOWER(interpret) = LOWER(?) 
+            WHERE LOWER(song_name) = LOWER(?) 
+            AND LOWER(artist) = LOWER(?) 
             ORDER BY jahr ASC, kw ASC 
             LIMIT 1
         ");

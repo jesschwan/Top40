@@ -1,0 +1,8 @@
+UPDATE top40 SET song_id = (SELECT songs.song_id FROM songs INNER JOIN top40 ON (songs.song_name = top40.song_name AND songs.artist = top40.artist));
+
+UPDATE top40 AS t
+JOIN songs AS s
+  ON s.song_name = t.song_name
+ AND s.artist    = t.artist
+SET t.song_id = s.song_id
+WHERE t.song_id IS NULL
