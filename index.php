@@ -53,12 +53,13 @@
 
                 // Vorwoche über song_id ermitteln (siehe neue Funktion unten)
                 $prev = getPreviousChartPosition(
-                    (int)$row['song_id'],
-                    $year,
-                    $kw,
-                    $entry->platz,
-                    $openDbConnection,
-                    $kwList
+                    $row['titel'],        // Titel
+                    $row['interpret'],    // Interpret
+                    $year,                // Jahr
+                    $kw,                  // KW
+                    $entry->platz,        // aktueller Platz
+                    $openDbConnection,    // DB-Connection
+                    $kwList               // KW-Liste
                 );
 
                 $entry->previousRank = $prev['prev'];
@@ -113,7 +114,7 @@
     }
 
     // Get previous rank and difference for a song
-    function getPreviousChartPosition($title, $interpret, $year, $kw, $currentRank, $openDbConnection, $kwList) {
+    function getPreviousChartPosition($song_name, $artist, $year, $kw, $currentRank, $openDbConnection, $kwList) {
         $searchKey = $year . '-' . str_pad($kw, 2, '0', STR_PAD_LEFT);
         $mappedKeys = array_map(fn($e) => $e['year'] . '-' . str_pad($e['kw'], 2, '0', STR_PAD_LEFT), $kwList);
         $currentIndex = array_search($searchKey, $mappedKeys);
@@ -126,14 +127,16 @@
 
         if ($hasPrev) {
             $stmt = $openDbConnection->prepare("
-                SELECT platz 
-                FROM top40 
-                WHERE LOWER(song_name) = LOWER(?) 
-                AND LOWER(artist) = LOWER(?) 
-                AND jahr = ? 
-                AND kw = ?
+                SELECT t.platz
+                FROM top40 t
+                JOIN songs s ON s.song_id = t.song_id
+                WHERE LOWER(s.song_name) = LOWER(?)
+                AND LOWER(s.artist) = LOWER(?)
+                AND t.jahr = ?
+                AND t.kw = ?
             ");
-            $stmt->bind_param("ssii", $title, $interpret, $prevYear, $prevKW);
+
+            $stmt->bind_param("ssii", $song_name, $artist, $prevYear, $prevKW);
             $stmt->execute();
             $stmt->bind_result($prevRank);
 
@@ -147,14 +150,15 @@
 
         // Check if this is the first appearance of the song
         $stmt2 = $openDbConnection->prepare("
-            SELECT jahr, kw 
-            FROM top40 
-            WHERE LOWER(song_name) = LOWER(?) 
-            AND LOWER(artist) = LOWER(?) 
-            ORDER BY jahr ASC, kw ASC 
+            SELECT t.jahr, t.kw
+            FROM top40 t
+            JOIN songs s ON s.song_id = t.song_id
+            WHERE LOWER(s.song_name) = LOWER(?)
+            AND LOWER(s.artist) = LOWER(?)
+            ORDER BY t.jahr ASC, t.kw ASC
             LIMIT 1
         ");
-        $stmt2->bind_param("ss", $title, $interpret);
+        $stmt2->bind_param("ss", $song_name, $artist);
         $stmt2->execute();
         $stmt2->bind_result($firstYear, $firstKW);
         $stmt2->fetch();
