@@ -10,7 +10,7 @@
 
         // Query: Top 40 entries of the selected calendar week directly from top40
         $query = "
-            SELECT t.platz, s.song_name, s.artist, s.cover_image, t.kw, t.jahr
+            SELECT t.platz, s.song_id, s.song_name, s.artist, s.cover_image, t.kw, t.jahr
             FROM top40 t
             JOIN songs s ON s.song_id = t.song_id
             WHERE t.jahr = ? AND t.kw = ?
@@ -69,45 +69,29 @@
         return $KWDataArray;
     }
 
-    // Find the closest earlier week in the database
-    function getNextEarlierWeek($openDbConnection, $year, $kw) {
-        // Monday of the current calendar week
-        $currentWeek = new DateTime();
-        $currentWeek->setISODate($year, $kw);
-        $currentDate = $currentWeek->format('Y-m-d');
+    function getNextEarlierWeek(int $year, int $kw, array $kwList) {
+        $searchKey = $year . '-' . str_pad($kw, 2, '0', STR_PAD_LEFT);
 
-        /*
-        $stmt = $openDbConnection->prepare("
-            SELECT weekYear 
-            FROM placings 
-            WHERE weekYear < ? 
-            ORDER BY weekYear DESC 
-            LIMIT 1
-        ");
-        */
+        $keys = array_map(
+            fn($e) => $e['year'] . '-' . str_pad($e['kw'], 2, '0', STR_PAD_LEFT),
+            $kwList
+        );
 
-        if (!$stmt) return null;
+        $index = array_search($searchKey, $keys, true);
 
-        $stmt->bind_param("s", $currentDate);
-        $stmt->execute();
-        $stmt->bind_result($prevWeekDate);
-
-        if ($stmt->fetch()) {
-            $stmt->close();
-            $prevDate = new DateTime($prevWeekDate);
-            $prevYear = (int)$prevDate->format('o');   // ISO Year
-            $prevKW   = (int)$prevDate->format('W');   // ISO Week
-            return [$prevYear, $prevKW];
+        if ($index === false || $index === 0) {
+            return null;
         }
 
-        $stmt->close();
-        return null;
+        return [
+            (int)$kwList[$index - 1]['year'],
+            (int)$kwList[$index - 1]['kw']
+        ];
     }
 
     // Return TRUE if no previous week exists
-    function hasNoPreviousWeek($openDbConnection, $year, $kw) {
-        $prev = getNextEarlierWeek($openDbConnection, $year, $kw);
-        return !$prev;
+    function hasNoPreviousWeek(int $year, int $kw, array $kwList) {
+        return getNextEarlierWeek($year, $kw, $kwList) === null;
     }
 
     // Get previous rank and difference for a song
@@ -177,15 +161,16 @@
     }
 
     // Label for previous week (table header)
-    function getPrevWeekLabel4Header($openDbConnection, $year, $kw) {
-        $prevWeekInfo = getNextEarlierWeek($openDbConnection, $year, $kw);
-        if ($prevWeekInfo) {
-            [$prevYear, $prevKW] = $prevWeekInfo;
-            $prevWeekLabel = "KW" . str_pad($prevKW, 2, '0', STR_PAD_LEFT) . " / " . $prevYear;
-        } else {
-            $prevWeekLabel = "No previous week";
+    function getPrevWeekLabel4Header(int $year, int $kw, array $kwList) {
+        $prev = getNextEarlierWeek($year, $kw, $kwList);
+
+        if ($prev === null) {
+            return "Keine Vorwoche";
         }
-        return $prevWeekLabel;
+
+        [$prevYear, $prevKW] = $prev;
+
+        return "KW" . str_pad($prevKW, 2, '0', STR_PAD_LEFT) . " / " . $prevYear;
     }
 
     // Open database connection
@@ -238,13 +223,15 @@
     $data = getData4KW($openDbConnection, $year, $kw, $kwList);
 
     // Get previous week label
-    $prevWeekLabel = getPrevWeekLabel4Header($openDbConnection, $year, $kw);
+    /*$prevWeekLabel = getPrevWeekLabel4Header($openDbConnection, $year, $kw);*/
+    $prevWeekLabel = getPrevWeekLabel4Header($year, $kw, $kwList);
 
     // Label for current week
     $selectedLabel = "KW" . str_pad($kw, 2, '0', STR_PAD_LEFT) . " / $year";
 
     // Show warning if no previous week exists
-    $showWarning = hasNoPreviousWeek($openDbConnection, $year, $kw);
+    /*$showWarning = hasNoPreviousWeek($openDbConnection, $year, $kw);*/
+     $showWarning   = hasNoPreviousWeek($year, $kw, $kwList);
                 
 ?>
 
