@@ -10,17 +10,12 @@
 
         // Query: Top 40 entries of the selected calendar week directly from top40
         $query = "
-        SELECT 
-            t.platz AS platz,
-            t.song_id AS song_id,
-            s.song_name AS titel,
-            s.artist AS interpret,
-            s.cover_image AS cover
-        FROM top40 t
-        JOIN songs s ON s.song_id = t.song_id
-        WHERE t.jahr = ? AND t.kw = ?
-        ORDER BY t.platz
-        LIMIT 40;
+            SELECT t.platz, s.song_name, s.artist, s.cover_image, t.kw, t.jahr
+            FROM top40 t
+            JOIN songs s ON s.song_id = t.song_id
+            WHERE t.jahr = ? AND t.kw = ?
+            ORDER BY t.platz ASC
+            LIMIT 40;
         ";
 
         $stmt = $openDbConnection->prepare($query);
@@ -38,9 +33,9 @@
             if ($currentRank != $row["platz"]) {
                 $entry = new Top40Entry(
                     (int)$row["platz"],
-                    $row["titel"],
-                    $row["interpret"],
-                    $row["cover"],
+                    $row["song_name"],
+                    $row["artist"],
+                    $row["cover_image"],
                     $kw,
                     $year,
                     null
@@ -48,13 +43,13 @@
 
                 // song_id an den Entry hängen (oder Constructor erweitern)
                 if (property_exists($entry, 'songId')) {
-                    $entry->songId = (int)$row['song_id'];
+                    $entry->songId = (int)$row['song_id']; // ?
                 }
 
                 // Vorwoche über song_id ermitteln (siehe neue Funktion unten)
                 $prev = getPreviousChartPosition(
-                    $row['titel'],        // Titel
-                    $row['interpret'],    // Interpret
+                    $row['song_name'],    // Titel
+                    $row['artist'],    // Interpret
                     $year,                // Jahr
                     $kw,                  // KW
                     $entry->platz,        // aktueller Platz
@@ -81,6 +76,7 @@
         $currentWeek->setISODate($year, $kw);
         $currentDate = $currentWeek->format('Y-m-d');
 
+        /*
         $stmt = $openDbConnection->prepare("
             SELECT weekYear 
             FROM placings 
@@ -88,6 +84,7 @@
             ORDER BY weekYear DESC 
             LIMIT 1
         ");
+        */
 
         if (!$stmt) return null;
 
