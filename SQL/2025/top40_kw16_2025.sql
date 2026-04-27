@@ -21,7 +21,7 @@ INSERT INTO `top40` (`platz`, `song_name`, `artist`, `kw`, `jahr`) VALUES ('20',
 INSERT INTO `top40` (`platz`, `song_name`, `artist`, `kw`, `jahr`) VALUES ('21', 'Flowers', 'Alle Farben x Graham Candy x Lahos', 16, 2025);
 INSERT INTO `top40` (`platz`, `song_name`, `artist`, `kw`, `jahr`) VALUES ('22', 'All My Life', 'Purple Disco Machine x The Magician', 16, 2025);
 INSERT INTO `top40` (`platz`, `song_name`, `artist`, `kw`, `jahr`) VALUES ('23', 'Ordinary', 'Alex Warren', 16, 2025);
-INSERT INTO `top40` (`platz`, `song_name`, `artist`, `kw`, `jahr`) VALUES ('24', 'Control Of Me', 'Topic x  Daecolm', 16, 2025);
+INSERT INTO `top40` (`platz`, `song_name`, `artist`, `kw`, `jahr`) VALUES ('24', 'Control Of Me', 'Topic x Daecolm', 16, 2025);
 INSERT INTO `top40` (`platz`, `song_name`, `artist`, `kw`, `jahr`) VALUES ('25', 'Rock N Roll', 'Leony x G-Eazy', 16, 2025);
 INSERT INTO `top40` (`platz`, `song_name`, `artist`, `kw`, `jahr`) VALUES ('26', 'That\'s So True', 'Gracie Abrams', 16, 2025);
 INSERT INTO `top40` (`platz`, `song_name`, `artist`, `kw`, `jahr`) VALUES ('27', 'Walk With Me', 'Felix Jaehn x Shouse', 16, 2025);

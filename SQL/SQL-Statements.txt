@@ -1,0 +1,25 @@
+ALTER TABLE top40
+ADD COLUMN song_id INT AFTER platz;
+
+UPDATE top40 AS t
+JOIN songs AS s
+  ON s.song_name = t.song_name
+ AND s.artist    = t.artist
+SET t.song_id = s.song_id
+WHERE t.song_id IS NULL;
+
+ALTER TABLE top40
+DROP COLUMN cover,
+DROP COLUMN song_name,
+DROP COLUMN artist;
+
+SELECT song_id AS 'song_id', song_name AS Titel, artist AS Interpret, cover_image AS Cover
+FROM songs
+WHERE song_name = "Busy Woman" (KW 21 2025; INSERT INTO `top40` (`platz`, `song_name`, `artist`, `kw`, `jahr`) VALUES ('39', 'Busy Woman', 'Sabrina Carpenter', 21, 2025);)
+OR song_name = "Priceless"
+OR song_name = "Control Of Me"
+OR song_name = "Do It Again";
+
+14 Is It Over Now? (Taylor's Version)
+130 Control Of Me (ohne NULL)
+206 Do It Again
