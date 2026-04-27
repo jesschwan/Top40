@@ -1,102 +1,62 @@
 <?php
-require_once "SqlConnection.php";
-require_once "Top40Entry.php";
-require_once "ImageFromAPI.php";
+require_once __DIR__ . "/SqlConnection.php";
 
-// Open database connection
-$openDbConnection = getSqlConnection();
+$db = getSqlConnection();
 
-// Fetch all distinct songs from the Top 40
-$sql = "SELECT DISTINCT titel, interpret FROM top40";
-$result = $openDbConnection->query($sql);
-if (!$result) die("DB Error: " . $openDbConnection->error);
+// Alle relevanten Songs aus den Top40 holen
+$sql = "
+    SELECT DISTINCT
+        s.song_id,
+        s.song_name,
+        s.artist
+    FROM top40 t
+    JOIN songs s ON t.song_id = s.song_id
+    ORDER BY s.song_id
+";
 
-// Folder containing images (can be omitted if not used)
-$folder = __DIR__ . '/images/';
-
-// Scan all AVIF and JPG files in the folder
-$allFiles = [];
-foreach (glob($folder . '*') as $file) {
-    if (preg_match('/\.(avif|jpg)$/i', $file)) {
-        $allFiles[] = $file;
-    }
+$result = $db->query($sql);
+if (!$result) {
+    die("DB Error: " . $db->error);
 }
 
-$notMatched = [];
+// Bilderordner
+$folder = __DIR__ . "/images/";
 
-// Display header
-echo "<h1>Image Comparison – Possible Matches</h1>";
+$missing = [];
 
-// Loop through all songs
+echo "<h1>🖼️ Cover‑Check (song_id‑basiert)</h1><hr>";
+
 while ($row = $result->fetch_assoc()) {
-    $title = $row['titel'];
-    $artist = $row['interpret'];
 
-    $entry = new Top40Entry(0, $title, $artist, null, 0, 0);
+    $songId = (int)$row['song_id'];
+    $title  = $row['song_name'];
+    $artist = $row['artist'];
 
-    // Prefer AVIF, fallback to JPG
-    $expectedFilenameAvif = $entry->getSafeFilename('avif');
-    $expectedFilenameJpg  = $entry->getSafeFilename('jpg');
-    $expectedPathAvif = $folder . $expectedFilenameAvif;
-    $expectedPathJpg  = $folder . $expectedFilenameJpg;
+    $avif = $folder . $songId . ".avif";
+    $jpg  = $folder . $songId . ".jpg";
 
-    $expectedFilename = null;
-    if (file_exists($expectedPathAvif)) {
-        $expectedFilename = $expectedFilenameAvif;
-    } elseif (file_exists($expectedPathJpg)) {
-        $expectedFilename = $expectedFilenameJpg;
-    }
-
-    // If a matching file exists, display it and continue
-    if ($expectedFilename !== null) {
-        echo "✅ Image found: <code>" . htmlspecialchars($expectedFilename) . "</code><br>";
-        continue;
-    }
-
-    // Fallback: scan all files and normalize names
-    $matched = false;
-    foreach ($allFiles as $filePath) {
-        $basename = basename($filePath);
-        $nameNoExt = pathinfo($basename, PATHINFO_FILENAME);
-
-        // Normalize dash characters
-        $nameNoExt = str_replace(["–", "—", "−"], " - ", $nameNoExt);
-
-        // Split into title and artist if possible
-        if (strpos($nameNoExt, ' - ') !== false) {
-            list($fTitle, $fArtist) = explode(' - ', $nameNoExt, 2);
-        } else {
-            $fTitle = $nameNoExt;
-            $fArtist = '';
-        }
-
-        $fileEntry = new Top40Entry(0, $fTitle, $fArtist, null, 0, 0);
-
-        // Compare AVIF and JPG filenames
-        if (strcasecmp($fileEntry->getSafeFilename('avif'), $entry->getSafeFilename('avif')) === 0 ||
-            strcasecmp($fileEntry->getSafeFilename('jpg'), $entry->getSafeFilename('jpg')) === 0) {
-            echo "✅ Image found (Fallback): <code>" . htmlspecialchars($basename) . "</code><br>";
-            $matched = true;
-            break;
-        }
-    }
-
-    // If no match found, add to the list
-    if (!$matched) {
-        echo "⚠️ No match found for: <strong>" . htmlspecialchars($title) . " - " . htmlspecialchars($artist) . "</strong><br>";
-        $notMatched[] = "$title - $artist";
+    if (file_exists($avif)) {
+        echo "✅ Cover vorhanden (AVIF): <strong>$songId</strong> – "
+           . htmlspecialchars("$title – $artist") . "<br>";
+    } elseif (file_exists($jpg)) {
+        echo "✅ Cover vorhanden (JPG): <strong>$songId</strong> – "
+           . htmlspecialchars("$title – $artist") . "<br>";
+    } else {
+        echo "⚠️ Kein Cover gefunden für: <strong>$songId</strong> – "
+           . htmlspecialchars("$title – $artist") . "<br>";
+        $missing[] = "$songId – $title – $artist";
     }
 }
 
-// Finished message
-echo "<br><strong>Done!</strong> No files were changed.<br>";
+echo "<hr><strong>Fertig.</strong> Es wurden keine Dateien oder Datenbankeinträge geändert.<br>";
 
-// Display all unmatched entries
-if (!empty($notMatched)) {
-    echo "<h3>No match found for:</h3><ul>";
-    foreach ($notMatched as $nm) {
-        echo "<li>" . htmlspecialchars($nm) . "</li>";
+if (!empty($missing)) {
+    echo "<h3>❌ Songs ohne Cover:</h3><ul>";
+    foreach ($missing as $m) {
+        echo "<li>" . htmlspecialchars($m) . "</li>";
     }
     echo "</ul>";
+} else {
+    echo "<p>🎉 Alle Top‑40‑Songs haben ein Cover!</p>";
 }
 ?>
